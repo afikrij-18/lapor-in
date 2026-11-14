@@ -24,9 +24,17 @@ export function TurnstileProvider({ children }) {
     waitersRef.current = [];
   }, []);
 
-  // Langkah 2: Catat kegagalan widget untuk developer; warga tidak melihat rincian teknisnya
+  // Langkah 2: Catat kegagalan widget untuk developer; warga tidak melihat rincian teknisnya.
+  // Token lama dibuang; widget mencoba lagi sendiri dan memanggil handleSuccess saat berhasil.
   const handleError = useCallback((errorCode) => {
-    console.error("Error pada TurnstileWidget:", errorCode);
+    console.error("Error pada TurnstileWidget (kode Cloudflare):", errorCode);
+    tokenRef.current = "";
+  }, []);
+
+  // Token kedaluwarsa (sekitar 5 menit): buang, jangan sampai terkirim ke server.
+  // Widget memperbaruinya sendiri dan memanggil handleSuccess dengan token baru.
+  const handleExpire = useCallback(() => {
+    tokenRef.current = "";
   }, []);
 
   // Langkah 3: Ambil token. Token sekali pakai, jadi setelah diambil widget diminta membuat yang baru
@@ -62,7 +70,12 @@ export function TurnstileProvider({ children }) {
   return (
     <TurnstileContext.Provider value={value}>
       {children}
-      <TurnstileWidget ref={widgetRef} onSuccess={handleSuccess} onError={handleError} />
+      <TurnstileWidget
+        ref={widgetRef}
+        onSuccess={handleSuccess}
+        onError={handleError}
+        onExpire={handleExpire}
+      />
     </TurnstileContext.Provider>
   );
 }
