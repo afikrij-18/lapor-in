@@ -121,6 +121,25 @@ function ChatPageContent() {
     };
   }, []);
 
+  // Langkah 1c: Setelah laporan terkirim, kosongkan draf saat warga meninggalkan halaman ini
+  // (ke peta, ke halaman utama, atau lewat tombol kembali browser), supaya laporan yang sama
+  // tidak bisa terkirim dua kali. Nilai terbaru disimpan di ref agar efek penutup cukup dipasang sekali.
+  const resetDraftRef = useRef(resetDraft);
+  const hasSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    resetDraftRef.current = resetDraft;
+    hasSubmittedRef.current = Boolean(submittedTicket);
+  }, [resetDraft, submittedTicket]);
+
+  useEffect(() => {
+    return () => {
+      if (hasSubmittedRef.current) {
+        resetDraftRef.current();
+      }
+    };
+  }, []);
+
   // Langkah 2: Jalankan pemrosesan awal laporan dari suara atau ketikan pertama
   const runInitialProcessing = useCallback(
     async ({ audioBlob, textInput }) => {
@@ -420,21 +439,16 @@ function ChatPageContent() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={() => {
-                resetDraft();
-                navigate("/peta");
-              }}
+              // Draf TIDAK direset di sini: reset membuat halaman ini memantul ke "/" lebih dulu,
+              // sehingga perpindahan ke peta kalah. Draf direset saat halaman ditutup (Langkah 1c).
+              onClick={() => navigate("/peta")}
               className="flex-1 rounded-xl bg-[#0A0A0A] px-4 py-3 text-base font-bold text-[#FFFFFF] hover:bg-[#171717]"
             >
               {t("nav.publicMap")}
             </button>
             <button
               type="button"
-              onClick={() => {
-                resetDraft();
-                setSubmittedTicket(null);
-                navigate("/");
-              }}
+              onClick={() => navigate("/")}
               className="flex-1 rounded-xl border border-[#0A0A0A] bg-[#FFFFFF] px-4 py-3 text-base font-bold text-[#0A0A0A] hover:bg-[#F5F5F5]"
             >
               {t("nav.newReport")}
