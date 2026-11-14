@@ -1,21 +1,52 @@
 // Route: /admin
-// Kerangka Halaman Dashboard Admin - Lapor.in (Polished UI)
+// Halaman Dashboard Admin dengan Pengecekan Admin Role yang Valid
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, ShieldCheck, AlertCircle, FileText, MapPin } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage.js';
+import { signOutAdmin, onAuthChange, isAdminUser } from '../services/authService.js';
 
 function AdminDashboardPage() {
-  // Langkah 1: Inisialisasi state tab aktif, router, dan lokalisasi
   const [activeTab, setActiveTab] = useState('queue');
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [adminUser, setAdminUser] = useState(null);
   const navigate = useNavigate();
   const { t } = useLanguage();
 
-  // Langkah 2: Tangani proses keluar (logout) sementara
-  const handleLogout = () => {
-    navigate('/admin/login');
+  // Langkah 1: Proteksi Route ketat menggunakan onAuthChange dan isAdminUser
+  useEffect(() => {
+    const unsubscribe = onAuthChange((user) => {
+      // Cek apakah user ada DAN benar-benar merupakan admin yang sah
+      if (!user || !isAdminUser(user)) {
+        // Jika bukan admin (misal sesi anonim warga), tendang ke halaman login
+        navigate('/admin/login', { replace: true });
+      } else {
+        setAdminUser(user);
+        setIsLoadingAuth(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
+
+  // Langkah 2: Tangani proses keluar (logout) admin
+  const handleLogout = async () => {
+    try {
+      await signOutAdmin(); // Ini akan mengeluarkan admin dan menggantinya ke sesi anonim warga
+      navigate('/admin/login', { replace: true });
+    } catch (error) {
+      console.error('Gagal keluar:', error);
+    }
   };
+
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] text-[#FFFFFF] flex items-center justify-center">
+        <p className="text-[#525252]">Memeriksa hak akses admin...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#FFFFFF] flex flex-col">
@@ -28,7 +59,9 @@ function AdminDashboardPage() {
           <span className="font-bold tracking-wider text-lg">LAPOR.IN ADMIN</span>
         </div>
         <div className="flex items-center space-x-4">
-          <span className="text-sm text-[#D4D4D4] hidden sm:inline">admin@laporin.id</span>
+          <span className="text-sm text-[#D4D4D4] hidden sm:inline">
+            {adminUser?.email || 'admin@laporin.id'}
+          </span>
           <button
             onClick={handleLogout}
             className="flex items-center space-x-1.5 px-3.5 py-2 bg-[#DC2626] hover:bg-[#B91C1C] active:scale-95 text-[#FFFFFF] rounded-lg text-sm font-medium transition-all duration-200 shadow-sm cursor-pointer"
