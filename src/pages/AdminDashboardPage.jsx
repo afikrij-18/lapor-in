@@ -1,39 +1,100 @@
 // Route: /admin
-// Halaman Dashboard Admin dengan Pengecekan Admin Role yang Valid
+// Halaman Dashboard Admin - Lapor.in
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, ShieldCheck, AlertCircle, FileText, MapPin } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage.js';
 import { signOutAdmin, onAuthChange, isAdminUser } from '../services/authService.js';
+import { listReportsForAdmin, updateReportStatus } from '../services/reportService.js';
+import AdminStatsBar from '../components/admin/AdminStatsBar.jsx';
+import ReportQueueTable from '../components/admin/ReportQueueTable.jsx';
 
 function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('queue');
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [adminUser, setAdminUser] = useState(null);
+  
+  // State data laporan dan statistik
+  const [reports, setReports] = useState([]);
+  const [stats, setStats] = useState({ total: 0, pending: 0, emergency: 0, resolved: 0 });
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
   const navigate = useNavigate();
   const { t } = useLanguage();
 
-  // Langkah 1: Proteksi Route ketat menggunakan onAuthChange dan isAdminUser
+  // PERBAIKAN: Deklarasikan fetchReports DI ATAS sebelum dipanggil di useEffect
+  const fetchReports = async () => {
+    setIsLoadingData(true);
+    try {
+      const data = await listReportsForAdmin();
+      
+      const activeData = (!data || data.length === 0) ? [
+        {
+          id: 'dummy-1',
+          ticketCode: 'LAPOR-001',
+          title: 'Jalan Berlubang Parah di Jl. Sudirman',
+          summary: 'Ada lubang besar berdiameter 1 meter yang membahayakan pengendara motor.',
+          urgency: 'Darurat',
+          status: 'pending',
+          isValidReport: true
+        },
+        {
+          id: 'dummy-2',
+          ticketCode: 'LAPOR-002',
+          title: 'Lampu Penerangan Jalan Mati',
+          summary: 'Lampu jalan mati total di sekitar area taman kota, rawan tindak kejahatan.',
+          urgency: 'Tinggi',
+          status: 'pending',
+          isValidReport: true
+        }
+      ] : data;
+
+      setReports(activeData);
+
+      // Hitung statistik ringkas
+      const total = activeData.length;
+      const pending = activeData.filter(r => !r.status || r.status === 'pending').length;
+      const emergency = activeData.filter(r => (r.urgency === 'Darurat' || r.urgency === 'DARURAT') && (!r.status || r.status === 'pending')).length;
+      const resolved = activeData.filter(r => r.status === 'resolved').length;
+
+      setStats({ total, pending, emergency, resolved });
+    } catch (error) {
+      console.error('Gagal memuat laporan admin:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  // Langkah 1: Proteksi rute admin (Diletakkan DI BAWAH deklarasi fetchReports)
   useEffect(() => {
     const unsubscribe = onAuthChange((user) => {
-      // Cek apakah user ada DAN benar-benar merupakan admin yang sah
       if (!user || !isAdminUser(user)) {
-        // Jika bukan admin (misal sesi anonim warga), tendang ke halaman login
         navigate('/admin/login', { replace: true });
       } else {
         setAdminUser(user);
         setIsLoadingAuth(false);
+        fetchReports(); // Aman dipanggil karena sudah dideklarasikan di atas
       }
     });
 
     return () => unsubscribe();
   }, [navigate]);
 
-  // Langkah 2: Tangani proses keluar (logout) admin
+  // Fungsi umum untuk memperbarui status laporan (Terima, Tolak, Proses, Selesai)
+  const handleStatusChange = async (reportId, newStatus) => {
+    try {
+      await updateReportStatus(reportId, newStatus);
+      fetchReports(); // Refresh data setelah status berubah
+    } catch (error) {
+      console.error('Gagal memperbarui status laporan:', error);
+    }
+  };
+
+  // Tangani proses keluar (logout)
   const handleLogout = async () => {
     try {
-      await signOutAdmin(); // Ini akan mengeluarkan admin dan menggantinya ke sesi anonim warga
+      await signOutAdmin();
       navigate('/admin/login', { replace: true });
     } catch (error) {
       console.error('Gagal keluar:', error);
@@ -47,6 +108,8 @@ function AdminDashboardPage() {
       </div>
     );
   }
+
+  const pendingQueue = reports.filter(r => !r.status || r.status === 'pending');
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#FFFFFF] flex flex-col">
@@ -78,6 +141,9 @@ function AdminDashboardPage() {
           {t('admin.dashboardTitle') || 'Dashboard Admin'}
         </h1>
 
+        {/* Baris Statistik Cepat */}
+        <AdminStatsBar stats={stats} />
+
         {/* Tab Navigasi */}
         <div className="flex border-b border-[#D4D4D4]/30 mb-6 space-x-2 sm:space-x-6 overflow-x-auto">
           <button
@@ -89,7 +155,7 @@ function AdminDashboardPage() {
             }`}
           >
             <AlertCircle size={18} />
-            <span>{t('admin.tabQueue') || 'Antrean Verifikasi'}</span>
+            <span>{t('admin.tabQueue') || 'Antrean Verifikasi'} ({pendingQueue.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('all')}
@@ -117,23 +183,35 @@ function AdminDashboardPage() {
 
         {/* Area Konten Dinamis Berdasarkan Tab */}
         <div className="bg-[#171717] border border-[#D4D4D4]/30 rounded-xl p-6 shadow-xl transition-all duration-300">
-          {activeTab === 'queue' && (
-            <div>
-              <h2 className="text-lg font-semibold mb-2">Antrean Laporan Masuk</h2>
-              <p className="text-sm text-[#525252]">Tabel antrean verifikasi akan diisi pada commit berikutnya.</p>
-            </div>
-          )}
-          {activeTab === 'all' && (
-            <div>
-              <h2 className="text-lg font-semibold mb-2">Semua Laporan Warga</h2>
-              <p className="text-sm text-[#525252]">Daftar seluruh laporan akan ditampilkan di sini.</p>
-            </div>
-          )}
-          {activeTab === 'map' && (
-            <div>
-              <h2 className="text-lg font-semibold mb-2">Peta Sebaran Laporan Admin</h2>
-              <p className="text-sm text-[#525252]">Peta interaktif Leaflet untuk pemantauan sebaran masalah.</p>
-            </div>
+          {isLoadingData ? (
+            <div className="text-center py-12 text-[#525252]">Memuat data laporan...</div>
+          ) : (
+            <>
+              {activeTab === 'queue' && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Antrean Laporan Masuk</h2>
+                  <ReportQueueTable
+                    reports={pendingQueue}
+                    onUpdateStatus={handleStatusChange}
+                  />
+                </div>
+              )}
+              {activeTab === 'all' && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Semua Laporan Warga</h2>
+                  <ReportQueueTable
+                    reports={reports}
+                    onUpdateStatus={handleStatusChange}
+                  />
+                </div>
+              )}
+              {activeTab === 'map' && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-2">Peta Sebaran Laporan Admin</h2>
+                  <p className="text-sm text-[#525252]">Peta interaktif Leaflet untuk pemantauan sebaran masalah.</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
