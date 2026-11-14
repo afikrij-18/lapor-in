@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Admin tunggal: dikenali dari custom claim atau email (PRD bagian 5)
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == "admin@laporin.id"
+      );
+    }
+
+    match /reports/{reportId} {
+      // Publik hanya bisa membaca laporan yang sudah diverifikasi atau ditindaklanjuti
+      allow read: if resource.data.status in ["verified", "in_progress", "resolved"] || isAdmin();
+
+      // Warga anonim terautentikasi dapat membuat laporan baru (foto opsional, lokasi wajib)
+      // Data privat (reporterUid, rawTranscript, adminNotes, hasAudio) tidak boleh ada di dokumen ini
+      allow create: if request.auth != null
+                    && !request.resource.data.keys().hasAny(["reporterUid", "rawTranscript", "adminNotes", "hasAudio"])
+                    && request.resource.data.status == "pending"
+                    && request.resource.data.latitude is number
+                    && request.resource.data.longitude is number
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 60
+                    && request.resource.data.summary is string
+                    && request.resource.data.summary.size() <= 1000
+                    && request.resource.data.hasPhoto is bool;
+
+      // Hanya 1 akun Admin yang dapat memverifikasi, mengedit, atau menghapus laporan
+      allow update, delete: if isAdmin();
+    }
+
+    match /report_private/{reportId} {
+      // Pelapor hanya bisa membuat data privat miliknya sendiri, dan tidak bisa membacanya kembali
+      allow create: if request.auth != null
+                    && request.resource.data.reporterUid == request.auth.uid;
+
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /report_photos/{reportId} {
+      // Foto hanya terbaca jika laporannya sudah diverifikasi, atau oleh admin
+      allow get: if isAdmin()
+                 || get(/databases/$(database)/documents/reports/$(reportId)).data.status
+                    in ["verified", "in_progress", "resolved"];
+
+      allow create: if request.auth != null
+                    && request.resource.data.data is bytes
+                    && request.resource.data.data.size() <= 600 * 1024
+                    && request.resource.data.contentType in ["image/jpeg", "image/webp"];
+
+      allow delete: if isAdmin();
+    }
+
+    match /report_audio/{reportId} {
+      // Rekaman hanya bisa didengar admin; dihapus cron setelah 30 hari
+      allow create: if request.auth != null
+                    && request.resource.data.reporterUid == request.auth.uid
+                    && request.resource.data.data is bytes
+                    && request.resource.data.data.size() <= 700 * 1024
+                    && request.resource.data.contentType.matches('audio/(webm|mp4|ogg).*');
+
+      allow get, delete: if isAdmin();
+    }
+
+    match /geocode_cache/{geohash} {
+      allow read: if true;
+      allow write: if false; // Hanya ditulis oleh server via Firebase Admin SDK
+    }
+
+    // Koleksi rate_limits sengaja tidak punya aturan: hanya server (Firebase Admin SDK) yang boleh mengaksesnya
+  }
+}

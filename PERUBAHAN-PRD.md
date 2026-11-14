@@ -78,6 +78,24 @@ Pembagian tugas anggota lain (Irfan, Nugi, Zikri, Taqi) sama dengan PRD awal.
 | Hapus laporan oleh admin | Dokumen laporan dan lampiran media | Ditambah dokumen `report_private` dan rekaman audio | 5.1 |
 | Koordinat lokasi | Persis dan publik | Tidak berubah | 8.1 |
 
+Catatan: baris "Folder Storage" di atas adalah keadaan revisi 14 November sebelum hackathon dimulai. Keadaan akhirnya ada di bagian 5a.
+
+## 5a. Penyimpanan Foto dan Rekaman (Revisi Saat Hackathon Dimulai)
+
+Firebase Storage ternyata membutuhkan paket Blaze, sehingga tidak dipakai. Rincian pertimbangannya ada di `USULAN-FIRESTORE.md`.
+
+| Hal | PRD Awal | PRD Terakhir | Bagian |
+|---|---|---|---|
+| Tempat foto dan rekaman | Firebase Storage | Firestore, sebagai `Bytes`, di koleksi baru `report_photos` dan `report_audio` | 8.1 |
+| Jumlah koleksi Firestore | Tiga | Enam: `reports`, `report_private`, `report_photos`, `report_audio`, `geocode_cache`, `rate_limits` | 8.1 |
+| Penanda foto di laporan | `photoUrl` (string URL atau `null`) | `hasPhoto` (boolean) | 7.3, 8.1 |
+| Penanda rekaman | Tidak ada | `hasAudio` (boolean) di `report_private` | 8.1 |
+| Ukuran foto tersimpan | Di bawah 1 MB | Maksimal 500 KB | 3, 7.1 |
+| Security Rules | `firestore.rules` dan `storage.rules` | `firestore.rules` saja | 8.3 |
+| Environment | Ada `VITE_FIREBASE_STORAGE_BUCKET` | Dihapus | 7.4 |
+| Kontrak service | Tidak ada | Fungsi `getReportPhotoUrl(reportId)` ditambahkan; `getReportAudioUrl` menerima `reportId` | 7.5 |
+| Nama branch | `feat/anggota-N-...` | Nama anggota: `fikri`, `irfan`, `nugi`, `zikri`, `taqi` | 9.1 |
+
 ## 6. Kontrak Data
 
 | Hal | PRD Awal | PRD Terakhir | Bagian |

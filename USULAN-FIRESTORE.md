@@ -1,7 +1,7 @@
 # Usulan: Menyimpan Foto dan Rekaman di Firestore
 
 - **Tanggal:** 14 November 2026
-- **Status:** Usulan, belum diputuskan. `PRD.md` belum diubah.
+- **Status:** Disetujui (pilihan B, Firestore saja) saat hackathon dimulai. Sudah diterapkan ke `PRD.md`; jika ada selisih, yang berlaku adalah `PRD.md`.
 - **Menyangkut PRD bagian:** 3, 7.1, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3
 
 ## 1. Masalah

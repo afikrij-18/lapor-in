@@ -9,6 +9,8 @@
 > Dikonversi dari `PRD - laporin.pdf`. Isi mengikuti PDF, dengan dua perubahan: `CRON_SECRET` yang tertulis lepas di akhir PDF dimasukkan ke daftar environment di bagian 7.4, dan bagian 1.3 beserta Status Dokumen direvisi pada 13 Nov 2026 (semula: seluruh kode ditulis manual tanpa AI code-agent). Revisi lain pada tanggal yang sama: batas judul 60 karakter dan ringkasan 1000 karakter diseragamkan (7.3, 8.1, 8.3), nama field `isValidReport` dan `audioQuality` diseragamkan (4.1 dan 5.1, semula `is_valid_report` dan `audio_quality`), Tailwind CSS menjadi `^4.3` (7.2), `tailwind.config.js` dihapus dari struktur folder (7.1) karena Tailwind v4 dikonfigurasi lewat CSS, file tanpa pemilik diserahkan ke Fikri (9.2), dan antarmuka menjadi Bahasa Indonesia saja dengan bahasa Inggris opsional di akhir project (2.2, 6, 7.1, 8.2, 9.2).
 >
 > Revisi 14 Nov 2026: rekaman dibatasi 120 detik dan alasan bitrate 24 kbps diluruskan (3, 4.1, 4.2); rekaman audio disimpan khusus admin selama 30 hari, dengan pemberitahuan di homepage dan tombol putar di dashboard admin (3, 5.1, 6.1, 6.4, 8.3); koleksi baru `report_private` untuk `rawTranscript`, `reporterUid`, `adminNotes`, dan `audioPath` (8.1, 8.3); metadata foto dibuang dan folder Storage dipisah per pengguna (7.1, 8.3); alur gagal dan format error seragam ditambahkan (3, 8.2); model menjadi Gemini 2.5 Flash tier gratis dengan SDK `@google/genai` dan API key terpisah untuk development dan demo (4, 7.2, 7.4, 8.2); `vite`, `@vitejs/plugin-react`, dan `@tailwindcss/vite` masuk daftar library (7.2); kontrak fungsi service ditambahkan (7.5); urutan antrean admin ditetapkan (5.1, 7.3). Versi library di 7.2 disamakan dengan yang terpasang di repository (React 19, `react-router-dom` 7, `react-leaflet` 5, `firebase` 13, `firebase-admin` 14, `lucide-react` 1.72, `@marsidev/react-turnstile` 1.6, `leaflet.markercluster` 1.5.3), ESLint masuk daftar library, dan `.eslintrc.cjs` diganti `eslint.config.js` (7.1, 9.2).
+>
+> Revisi saat hackathon dimulai (14 Nov 2026): Firebase Storage tidak dipakai karena membutuhkan paket Blaze. Foto dan rekaman disimpan di Firestore sebagai `Bytes` pada koleksi baru `report_photos` dan `report_audio`; `photoUrl` menjadi `hasPhoto`, `audioPath` menjadi `hasAudio`, foto hasil kompresi dibatasi 500 KB, `storage.rules` dan `VITE_FIREBASE_STORAGE_BUCKET` dihapus, dan `getReportPhotoUrl` ditambahkan ke kontrak service (3, 7.1, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3). Nama branch kerja menjadi nama anggota (9.1). Rincian: `USULAN-FIRESTORE.md`.
 
 ---
 
@@ -80,7 +82,7 @@ Antarmuka Lapor.in menggunakan skema kontras tinggi **Hitam, Merah, Putih** untu
    - Jika berasal dari rekaman suara, audio dikirim ke endpoint `/api/process-report` untuk dibersihkan dari kebisingan (*noise filtering*), ditranskripsikan, dan dirapikan dari gangguan bicara (gagap/pengulangan suku kata) maupun dialek daerah menjadi kalimat inti yang jelas.
    - Asisten AI menampilkan **Kartu Ringkasan Awal** (Judul, Kategori dugaan, Urgensi dugaan, dan Ringkasan masalah) serta membacakannya melalui **Text-to-Speech (TTS)** browser (dapat dimatikan dengan tombol mute).
 2. **Panduan Bertahap oleh AI (Conversational Guidance):**
-   - **Tahap Foto (Opsional):** AI bertanya: *"Apakah Anda memiliki foto kondisi di lokasi? Jika ada, silakan unggah. Jika tidak ada, tekan Lewati."* Pengguna dapat mengunggah foto (`JPG/PNG/WebP`, maks `5MB`) atau menekan tombol **Lewati Foto**.
+   - **Tahap Foto (Opsional):** AI bertanya: *"Apakah Anda memiliki foto kondisi di lokasi? Jika ada, silakan unggah. Jika tidak ada, tekan Lewati."* Pengguna dapat mengunggah foto (`JPG/PNG/WebP`, maks `5MB`; dikompresi di browser menjadi maksimal `500 KB` sebelum disimpan) atau menekan tombol **Lewati Foto**.
    - **Tahap Lokasi (Wajib):** AI meminta lokasi kejadian. Pengguna dapat menekan tombol *"Gunakan Lokasi Saya Saat Ini"* (Browser GPS + Reverse Geocoding OSM Nominatim) atau memilih/menggeser pin pada peta mini Leaflet.js.
    - **Tahap Informasi Tambahan (Opsional):** AI menanyakan patokan lokasi atau detail tambahan singkat jika masih diperlukan.
 3. **Fitur Edit Laporan di Dalam Chatbot AI:**
@@ -89,7 +91,7 @@ Antarmuka Lapor.in menggunakan skema kontras tinggi **Hitam, Merah, Putih** untu
    - AI memperbarui state laporan lokal dan menampilkan ulang kartu pratinjau yang sudah direvisi.
 4. **Konfirmasi & Pengiriman Final:**
    - Pengguna menekan tombol **"Kirim Laporan Sekarang"**.
-   - Sistem mengunggah foto (jika ada, tanpa metadata) dan rekaman audio (jika laporan berasal dari jalur suara) ke Firebase Storage, menyimpan dokumen laporan ke koleksi `reports` dengan status `"pending"` beserta data privatnya ke koleksi `report_private`, lalu menampilkan **Kode Tiket Pelacakan** (contoh: `LPR-2026-8492`).
+   - Sistem mengunggah foto (jika ada, tanpa metadata) dan rekaman audio (jika laporan berasal dari jalur suara) ke Firestore (koleksi `report_photos` dan `report_audio`), menyimpan dokumen laporan ke koleksi `reports` dengan status `"pending"` beserta data privatnya ke koleksi `report_private`, lalu menampilkan **Kode Tiket Pelacakan** (contoh: `LPR-2026-8492`).
    - Rekaman audio baru diunggah pada langkah ini. Sebelum itu rekaman hanya berada di memori browser, sehingga laporan yang dibatalkan tidak meninggalkan rekaman. Rekaman yang tersimpan dihapus otomatis setelah 30 hari oleh cron `cleanup-audio`.
 
 ### Langkah 3: Peta Sebaran & Status Publik (`/peta`)
@@ -106,7 +108,7 @@ Setiap kegagalan di bawah ini harus berakhir pada jalan keluar bagi warga, bukan
 | `/api/process-report` gagal, timeout, atau kuota Gemini habis | Tampilkan tombol **"Coba Lagi"**. Jika gagal lagi, warga mengisi sendiri judul, kategori, urgensi, dan ringkasan di kartu pratinjau tanpa AI (`audioQuality: "text_input"`). Rekaman yang sudah ada tetap ikut dikirim bersama laporan. |
 | AI mengembalikan `isValidReport: false` atau `audioQuality: "unusable"` | Draf tidak dibuat. Warga diminta merekam ulang atau mengetik laporannya. |
 | Izin GPS ditolak atau lokasi gagal didapat | Warga menentukan lokasi dengan pin pada peta mini. Jika reverse geocoding gagal, koordinat tetap dipakai dan warga mengetik alamatnya sendiri. |
-| Pengiriman laporan gagal | Draf, foto, dan rekaman tetap di memori browser, dan tombol **"Kirim Ulang"** ditampilkan. Jika hanya unggahan foto atau rekaman yang gagal, warga ditawari mengirim laporan tanpa lampiran tersebut. |
+| Pengiriman laporan gagal | Draf, foto, dan rekaman tetap di memori browser, dan tombol **"Kirim Ulang"** ditampilkan. Jika hanya foto atau rekaman yang gagal disimpan (termasuk foto yang masih di atas `500 KB` setelah dikompresi), warga ditawari mengirim laporan tanpa lampiran tersebut. |
 | `/api/chat-assistant` gagal | Tampilkan pesan singkat. Tombol **Edit Field** pada kartu pratinjau dan tombol Quick Actions tetap berfungsi karena tidak memanggil AI. |
 
 ---
@@ -312,7 +314,7 @@ lapor.in/
 │   │       ├── ReportQueueTable.jsx
 │   │       └── ReportEditModal.jsx
 │   ├── config/
-│   │   ├── firebase.js                 # Inisialisasi Firebase App, Auth, Firestore, Storage
+│   │   ├── firebase.js                 # Inisialisasi Firebase App, Auth, dan Firestore
 │   │   └── constants.js                # Enum kategori, urgensi, status, palet warna
 │   ├── context/
 │   │   ├── LanguageContext.jsx         # State global bahasa (ID; EN opsional)
@@ -329,20 +331,19 @@ lapor.in/
 │   │   └── AdminDashboardPage.jsx      # Route: /admin
 │   ├── services/
 │   │   ├── apiClient.js                # Wrapper fetch ke /api/*
-│   │   ├── reportService.js            # Operasi CRUD Firestore & upload Firebase Storage
+│   │   ├── reportService.js            # Operasi CRUD Firestore, termasuk foto & rekaman (Bytes)
 │   │   └── authService.js              # Silent Anonymous Auth & Admin Email/Password Auth
 │   ├── utils/
 │   │   ├── geohashHelper.js            # Generator geohash presisi 7 & 8
-│   │   ├── imageCompressor.js          # Kompresi foto (< 1MB) & buang metadata EXIF sebelum upload
+│   │   ├── imageCompressor.js          # Kompresi foto (maks 500 KB) & buang metadata EXIF
 │   │   └── ticketGenerator.js          # Pembuat kode tiket format LPR-YYYY-XXXX
 │   ├── App.jsx                         # Konfigurasi React Router DOM
 │   ├── main.jsx                        # Entry point React
 │   └── index.css                       # Konfigurasi Tailwind CSS & CSS Variables warna
 ├── .env.example                        # Template variabel environment
 ├── eslint.config.js                    # Aturan linting standar tim (ESLint flat config)
-├── firebase.json                       # Konfigurasi Firestore & Storage Rules
-├── firestore.rules                     # Aturan keamanan database
-├── storage.rules                       # Aturan keamanan file upload
+├── firebase.json                       # Konfigurasi Firestore Rules
+├── firestore.rules                     # Aturan keamanan database (termasuk foto & rekaman)
 ├── package.json
 └── vercel.json                         # Konfigurasi rewrites & cron job
 ```
@@ -356,7 +357,7 @@ lapor.in/
 | **Build Tool** | `vite`, `@vitejs/plugin-react` | `^8.3` / `^6.3` | Dev server, build, dan dukungan JSX React |
 | **Styling** | `tailwindcss`, `@tailwindcss/vite` | `^4.3` | Utility-first CSS styling; plugin Vite untuk Tailwind v4 |
 | **Icons** | `lucide-react` | `^1.72` | Ikon mikrofon, peta, kamera, status, dan admin |
-| **Backend SDK (Client)** | `firebase` | `^13.3` | Firebase Auth, Firestore, dan Cloud Storage |
+| **Backend SDK (Client)** | `firebase` | `^13.3` | Firebase Auth dan Firestore (Firebase Storage tidak dipakai karena butuh paket Blaze) |
 | **Maps** | `leaflet`, `react-leaflet`, `leaflet.markercluster` | `^1.9.4` / `^5.0` / `^1.5.3` | Peta interaktif OpenStreetMap & clustering |
 | **Geohash** | `ngeohash` | `^0.6.4` | Enkode koordinat lat/lng ke string geohash presisi 7-8 |
 | **Anti-Bot** | `@marsidev/react-turnstile` | `^1.6.3` | Komponen Cloudflare Turnstile transparan |
@@ -414,7 +415,7 @@ export const INITIAL_REPORT_DRAFT = {
   summary: "",                // string, ringkasan baku maks 1000 karakter
   rawTranscript: "",          // string, transkrip mentah; disimpan ke report_private, bukan reports
   audioBlob: null,            // Blob rekaman, hanya di memori browser sampai laporan dikirim
-  photoUrl: null,             // string URL Firebase Storage atau null (opsional)
+  hasPhoto: false,            // boolean, true jika laporan punya foto di report_photos
   latitude: null,             // number, wajib terisi sebelum submit
   longitude: null,            // number, wajib terisi sebelum submit
   address: "",                // string alamat hasil reverse geocoding
@@ -430,7 +431,6 @@ export const INITIAL_REPORT_DRAFT = {
   - `VITE_FIREBASE_API_KEY`
   - `VITE_FIREBASE_AUTH_DOMAIN`
   - `VITE_FIREBASE_PROJECT_ID`
-  - `VITE_FIREBASE_STORAGE_BUCKET`
   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
   - `VITE_FIREBASE_APP_ID`
   - `VITE_TURNSTILE_SITE_KEY`
@@ -443,7 +443,7 @@ export const INITIAL_REPORT_DRAFT = {
 
 ### 7.5 Kontrak Fungsi Service (`src/services/*`)
 
-Halaman dan komponen **dilarang** memanggil Firestore, Storage, atau `fetch` ke `/api/*` secara langsung; semuanya lewat fungsi di bawah ini. Nama fungsi, urutan parameter, dan bentuk nilai kembalian tidak boleh diubah tanpa persetujuan Project Lead. Semua fungsi bersifat `async`. Saat gagal, fungsi melempar `Error` dengan properti `code` (lihat format error di bagian 8.2).
+Halaman dan komponen **dilarang** memanggil Firestore atau `fetch` ke `/api/*` secara langsung; semuanya lewat fungsi di bawah ini. Nama fungsi, urutan parameter, dan bentuk nilai kembalian tidak boleh diubah tanpa persetujuan Project Lead. Semua fungsi bersifat `async`. Saat gagal, fungsi melempar `Error` dengan properti `code` (lihat format error di bagian 8.2).
 
 #### `reportService.js`
 
@@ -451,14 +451,17 @@ Objek `report` pada tabel ini adalah isi dokumen `reports` ditambah `id` (ID dok
 
 | Fungsi | Parameter | Nilai Kembalian | Dipakai Oleh | Keterangan |
 |---|---|---|---|---|
-| `createReport(draft, photoFile, audioBlob)` | `draft`: objek `INITIAL_REPORT_DRAFT` yang sudah terisi; `photoFile`: `File` atau `null`; `audioBlob`: `Blob` atau `null` | `{ reportId, ticketCode }` | Halaman chat | Membuat kode tiket, mengunggah foto ke `reports/{uid}/` dan rekaman ke `report_audio/{uid}/`, lalu menulis dokumen `reports/{reportId}` dan `report_private/{reportId}` dalam satu batch. |
+| `createReport(draft, photoFile, audioBlob)` | `draft`: objek `INITIAL_REPORT_DRAFT` yang sudah terisi; `photoFile`: `File`/`Blob` hasil `imageCompressor.js` atau `null`; `audioBlob`: `Blob` atau `null` | `{ reportId, ticketCode }` | Halaman chat | Membuat kode tiket, lalu menulis sampai empat dokumen dalam satu batch: `reports/{reportId}`, `report_private/{reportId}`, `report_photos/{reportId}` (jika ada foto), dan `report_audio/{reportId}` (jika ada rekaman). Melempar `PHOTO_TOO_LARGE` jika foto di atas 500 KB. |
 | `listPublicReports()` | tidak ada | `report[]` | Peta publik | Hanya laporan berstatus `verified`, `in_progress`, atau `resolved`. Query wajib memfilter status agar lolos Security Rules. |
 | `listReportsForAdmin(status)` | `status`: salah satu `REPORT_STATUS`, atau `null` untuk semua | `report[]` | Dashboard admin | Hasil sudah diurutkan sesuai aturan antrean di bagian 5.1. |
-| `getReportPrivate(reportId)` | `reportId`: string | `{ rawTranscript, reporterUid, adminNotes, audioPath }` | Dashboard admin | Khusus admin. |
-| `getReportAudioUrl(audioPath)` | `audioPath`: string dari `report_private` | string URL | Dashboard admin | Untuk tombol "Putar Rekaman". Khusus admin. |
+| `getReportPrivate(reportId)` | `reportId`: string | `{ rawTranscript, reporterUid, adminNotes, hasAudio }` | Dashboard admin | Khusus admin. |
+| `getReportPhotoUrl(reportId)` | `reportId`: string | string URL sementara, atau `null` jika tidak ada foto | Peta publik, dashboard admin | Dipanggil hanya untuk laporan dengan `hasPhoto: true`, saat laporan dibuka. |
+| `getReportAudioUrl(reportId)` | `reportId`: string | string URL sementara, atau `null` jika tidak ada rekaman | Dashboard admin | Untuk tombol "Putar Rekaman". Khusus admin. |
 | `updateReport(reportId, fields)` | `fields`: sebagian dari `title`, `category`, `urgency`, `summary`, `address` | tidak ada | Dashboard admin | Koreksi data sebelum publikasi. Mengisi `updatedAt`. |
 | `updateReportStatus(reportId, status, adminNotes)` | `status`: salah satu `REPORT_STATUS`; `adminNotes`: string atau `null` | tidak ada | Dashboard admin | Menulis `status` ke `reports` dan `adminNotes` ke `report_private`. |
-| `deleteReport(reportId)` | `reportId`: string | tidak ada | Dashboard admin | Menghapus dokumen `reports`, dokumen `report_private`, foto, dan rekaman audio. |
+| `deleteReport(reportId)` | `reportId`: string | tidak ada | Dashboard admin | Menghapus dokumen `reports`, `report_private`, `report_photos`, dan `report_audio` milik laporan itu. |
+
+URL sementara dari `getReportPhotoUrl` dan `getReportAudioUrl` dibuat dengan `URL.createObjectURL`. Komponen yang memakainya wajib melepasnya dengan `URL.revokeObjectURL` saat ditutup.
 
 #### `authService.js`
 
@@ -495,7 +498,7 @@ Setiap dokumen menggunakan ID otomatis Firestore (`reportId`):
 | `category` | `string` | Ya | `"Infrastruktur"`, `"Kebersihan"`, `"Keamanan"`, `"Fasilitas Umum"`, `"Lainnya"` |
 | `urgency` | `string` | Ya | `"Darurat"`, `"Tinggi"`, `"Normal"` |
 | `summary` | `string` | Ya | Ringkasan laporan bahasa Indonesia baku (maksimal 1000 karakter) |
-| `photoUrl` | `string` atau `null` | Tidak | URL publik Firebase Storage jika melampirkan foto, atau `null` |
+| `hasPhoto` | `boolean` | Ya | `true` jika laporan punya foto di `report_photos/{reportId}` |
 | `latitude` | `number` | Ya | Koordinat lintang (`-90` s/d `90`) |
 | `longitude` | `number` | Ya | Koordinat bujur (`-180` s/d `180`) |
 | `address` | `string` | Ya | Nama jalan/kelurahan/kecamatan hasil reverse geocoding |
@@ -516,11 +519,34 @@ Document ID sama dengan `reportId` pada koleksi `reports`. Dibuat oleh pelapor b
 |---|---|---|---|
 | `reporterUid` | `string` | Ya | UID dari Firebase Anonymous Auth (`request.auth.uid`) |
 | `rawTranscript` | `string` | Tidak | Teks asli sebelum normalisasi AI, untuk audit admin |
-| `audioPath` | `string` atau `null` | Tidak | Lokasi rekaman di Storage (`report_audio/{uid}/{fileName}`); `null` jika laporan diketik atau rekaman sudah dihapus cron |
+| `hasAudio` | `boolean` | Ya | `true` jika rekaman ada di `report_audio/{reportId}`; `false` jika laporan diketik atau rekaman sudah dihapus cron |
 | `adminNotes` | `string` | Tidak | Catatan verifikasi atau alasan penolakan oleh Admin |
 | `createdAt` | `timestamp` | Ya | `serverTimestamp()` saat laporan dikirim |
 
-#### Koleksi 3: `geocode_cache` (Cache Alamat OSM Nominatim)
+#### Koleksi 3: `report_photos` (Foto Bukti)
+
+Firebase Storage tidak dipakai karena membutuhkan paket Blaze. Foto dan rekaman disimpan di Firestore sebagai tipe `Bytes`, dengan batas satu dokumen 1 MiB. Keduanya tidak ditaruh di dokumen `reports` agar daftar laporan di peta tidak ikut mengunduh semua file. Document ID sama dengan `reportId`.
+
+| Nama Field | Tipe Data | Wajib | Keterangan & Validasi |
+|---|---|---|---|
+| `data` | `bytes` | Ya | Isi foto hasil kompresi, maksimal 600 KB (target kompresi 500 KB) |
+| `contentType` | `string` | Ya | `"image/jpeg"` atau `"image/webp"` |
+| `createdAt` | `timestamp` | Ya | `serverTimestamp()` |
+
+Dokumen ini terbaca publik setelah laporannya diverifikasi, sehingga sengaja tidak memuat `reporterUid`.
+
+#### Koleksi 4: `report_audio` (Rekaman Suara, Khusus Admin)
+
+Document ID sama dengan `reportId`. Dihapus cron `cleanup-audio` setelah 30 hari.
+
+| Nama Field | Tipe Data | Wajib | Keterangan & Validasi |
+|---|---|---|---|
+| `data` | `bytes` | Ya | Isi rekaman, maksimal 700 KB |
+| `contentType` | `string` | Ya | `audio/webm`, `audio/mp4`, atau `audio/ogg` |
+| `reporterUid` | `string` | Ya | UID pelapor |
+| `createdAt` | `timestamp` | Ya | `serverTimestamp()`, dipakai cron untuk menghitung umur |
+
+#### Koleksi 5: `geocode_cache` (Cache Alamat OSM Nominatim)
 
 Document ID menggunakan string `geohash` presisi 7 (contoh: `"w22z9x4"`):
 
@@ -529,7 +555,7 @@ Document ID menggunakan string `geohash` presisi 7 (contoh: `"w22z9x4"`):
 | `address` | `string` | Alamat hasil reverse geocoding (kelurahan/jalan umum tanpa nomor rumah) |
 | `cachedAt` | `timestamp` | Waktu penyimpanan cache (masa berlaku 30 hari) |
 
-#### Koleksi 4: `rate_limits` (Pembatasan Anti-Spam)
+#### Koleksi 6: `rate_limits` (Pembatasan Anti-Spam)
 
 Document ID menggunakan hash IP atau `reporterUid`:
 
@@ -655,10 +681,10 @@ Setiap endpoint yang gagal membalas dengan status HTTP `4xx` atau `5xx` dan satu
 
 #### Endpoint 4: `GET /api/cleanup-audio`
 
-- **Fungsi:** Cron job harian (pukul `02:00 WIB`) untuk menghapus rekaman audio di folder `report_audio/` yang berumur lebih dari 30 hari dan mengosongkan `audioPath` (`null`) pada dokumen `report_private` terkait, agar janji retensi kepada warga terpenuhi dan kuota Storage tetap di bawah batas gratis `5 GB`. Eksekusi selesai di bawah `10 detik` (batas timeout Vercel Free Tier).
+- **Fungsi:** Cron job harian (pukul `02:00 WIB`) untuk menghapus dokumen di koleksi `report_audio` yang `createdAt`-nya lebih dari 30 hari dan mengubah `hasAudio` menjadi `false` pada dokumen `report_private` terkait, agar janji retensi kepada warga terpenuhi dan pemakaian Firestore tetap di bawah batas gratis. Eksekusi selesai di bawah `10 detik` (batas timeout Vercel Free Tier).
 - **Keamanan:** Memvalidasi header `Authorization: Bearer <CRON_SECRET>`.
 
-### 8.3 Firebase Security Rules (`firestore.rules` & `storage.rules`)
+### 8.3 Firebase Security Rules (`firestore.rules`)
 
 #### `firestore.rules`
 
@@ -680,7 +706,7 @@ service cloud.firestore {
       // Warga anonim terautentikasi dapat membuat laporan baru (foto opsional, lokasi wajib)
       // Data privat (reporterUid, rawTranscript, adminNotes) tidak boleh ada di dokumen ini
       allow create: if request.auth != null
-                    && !request.resource.data.keys().hasAny(["reporterUid", "rawTranscript", "adminNotes", "audioPath"])
+                    && !request.resource.data.keys().hasAny(["reporterUid", "rawTranscript", "adminNotes", "hasAudio"])
                     && request.resource.data.status == "pending"
                     && request.resource.data.latitude is number
                     && request.resource.data.longitude is number
@@ -689,7 +715,7 @@ service cloud.firestore {
                     && request.resource.data.title.size() <= 60
                     && request.resource.data.summary is string
                     && request.resource.data.summary.size() <= 1000
-                    && (request.resource.data.photoUrl == null || request.resource.data.photoUrl is string);
+                    && request.resource.data.hasPhoto is bool;
 
       // Hanya 1 akun Admin yang dapat memverifikasi, mengedit, atau menghapus laporan
       allow update, delete: if isAdmin();
@@ -703,6 +729,31 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    match /report_photos/{reportId} {
+      // Foto hanya terbaca jika laporannya sudah diverifikasi, atau oleh admin
+      allow get: if isAdmin()
+                 || get(/databases/$(database)/documents/reports/$(reportId)).data.status
+                    in ["verified", "in_progress", "resolved"];
+
+      allow create: if request.auth != null
+                    && request.resource.data.data is bytes
+                    && request.resource.data.data.size() <= 600 * 1024
+                    && request.resource.data.contentType in ["image/jpeg", "image/webp"];
+
+      allow delete: if isAdmin();
+    }
+
+    match /report_audio/{reportId} {
+      // Rekaman hanya bisa didengar admin; dihapus cron setelah 30 hari
+      allow create: if request.auth != null
+                    && request.resource.data.reporterUid == request.auth.uid
+                    && request.resource.data.data is bytes
+                    && request.resource.data.data.size() <= 700 * 1024
+                    && request.resource.data.contentType.matches('audio/(webm|mp4|ogg).*');
+
+      allow get, delete: if isAdmin();
+    }
+
     match /geocode_cache/{geohash} {
       allow read: if true;
       allow write: if false; // Hanya ditulis oleh server via Firebase Admin SDK
@@ -711,42 +762,7 @@ service cloud.firestore {
 }
 ```
 
-#### `storage.rules`
-
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    function isAdmin() {
-      return request.auth != null && (
-        request.auth.token.admin == true ||
-        request.auth.token.email == "admin@laporin.id"
-      );
-    }
-
-    // Foto bukti: terbaca publik, hanya bisa diunggah ke folder milik sendiri
-    match /reports/{uid}/{fileName} {
-      allow read: if true;
-      allow create: if request.auth != null
-                    && request.auth.uid == uid
-                    && request.resource.size < 5 * 1024 * 1024
-                    && request.resource.contentType.matches('image/(jpeg|png|webp)');
-      allow delete: if isAdmin();
-    }
-
-    // Rekaman audio: hanya admin yang bisa mendengar; dihapus cron setelah 30 hari
-    match /report_audio/{uid}/{fileName} {
-      allow read, delete: if isAdmin();
-      allow create: if request.auth != null
-                    && request.auth.uid == uid
-                    && request.resource.size < 2 * 1024 * 1024
-                    && request.resource.contentType.matches('audio/(webm|mp4|ogg).*');
-    }
-  }
-}
-```
-
-Foto diunggah setelah melewati `imageCompressor.js`, yang menggambar ulang gambar sehingga metadata EXIF (termasuk koordinat GPS dan model perangkat) tidak ikut tersimpan.
+Foto disimpan setelah melewati `imageCompressor.js`, yang menggambar ulang gambar sehingga metadata EXIF (termasuk koordinat GPS dan model perangkat) tidak ikut tersimpan.
 
 ---
 
@@ -755,19 +771,19 @@ Foto diunggah setelah melewati `imageCompressor.js`, yang menggambar ulang gamba
 ### 9.1 Strategi Branching GitHub (`main` sebagai Branch Utama)
 
 1. **`main`:** Branch produksi stabil. Dilindungi (*Branch Protection*): tidak boleh `git push` langsung ke `main`; semua perubahan wajib melalui **Pull Request (PR)** dan direview minimal oleh 1 anggota lain.
-2. **Naming Convention Feature Branch:**
-   - `feat/anggota-1-setup-auth`
-   - `feat/anggota-2-home-audio`
-   - `feat/anggota-3-chat-ai`
-   - `feat/anggota-4-map-geocode`
-   - `feat/anggota-5-admin-dashboard`
+2. **Nama Branch Kerja:** setiap anggota bekerja di satu branch bernama dirinya sendiri (huruf kecil):
+   - `fikri`
+   - `irfan`
+   - `nugi`
+   - `zikri`
+   - `taqi`
 3. **Aturan Commit Message:** Gunakan format konvensional: `feat: ...`, `fix: ...`, `style: ...`, `docs: ...`.
 
 ### 9.2 Matriks Pembagian Tugas Detail (Anggota 1 - Anggota 5)
 
 | Anggota | Peran & Fokus Modul | File & Folder Tanggung Jawab Utama | Deliverables Wajib |
 |---|---|---|---|
-| **Fikri** | **Project Lead, Scaffold Project, Firebase Core, Auth & Security Rules** | `src/config/firebase.js`, `src/config/constants.js`, `src/services/authService.js`, `src/services/reportService.js`, `src/services/apiClient.js`, `src/context/LanguageContext.jsx`, `src/App.jsx`, `src/main.jsx`, `src/index.css`, `src/components/common/Footer.jsx`, `firestore.rules`, `storage.rules`, `firebase.json`, `vercel.json`, `package.json`, `.env.example`, `eslint.config.js`, `public/locales/id.json` | Setup repo GitHub & Vercel, scaffold project (routing semua halaman di `App.jsx`, konfigurasi Tailwind & CSS Variables, `apiClient`), inisialisasi Firebase (Silent Auth + Akun `admin@laporin.id`), deployment Security Rules, dan kamus teks antarmuka `id.json`. |
+| **Fikri** | **Project Lead, Scaffold Project, Firebase Core, Auth & Security Rules** | `src/config/firebase.js`, `src/config/constants.js`, `src/services/authService.js`, `src/services/reportService.js`, `src/services/apiClient.js`, `src/context/LanguageContext.jsx`, `src/App.jsx`, `src/main.jsx`, `src/index.css`, `src/components/common/Footer.jsx`, `firestore.rules`, `firebase.json`, `vercel.json`, `package.json`, `.env.example`, `eslint.config.js`, `public/locales/id.json` | Setup repo GitHub & Vercel, scaffold project (routing semua halaman di `App.jsx`, konfigurasi Tailwind & CSS Variables, `apiClient`), inisialisasi Firebase (Silent Auth + Akun `admin@laporin.id`), deployment Security Rules, dan kamus teks antarmuka `id.json`. |
 | **Irfan** | **Homepage UI, Web Audio Recorder & Aksesibilitas Suara** | `src/pages/HomePage.jsx`, `src/components/home/*`, `src/hooks/useAudioRecorder.js`, `src/hooks/useSpeechSynthesis.js`, `src/components/common/Navbar.jsx`, `src/components/common/TurnstileWidget.jsx` | Membangun Homepage palet Hitam-Merah-Putih, tombol mikrofon besar `#DC2626`, tombol ketik manual, perekaman suara *noise-suppressed*, dan fitur TTS pembaca balasan AI. |
 | **Nugi** | **Halaman Chat Interaktif, Integrasi Gemini AI & Fitur Edit Laporan** | `src/pages/ChatPage.jsx`, `src/components/chat/*`, `src/context/ReportDraftContext.jsx`, `api/process-report.js`, `api/chat-assistant.js`, `src/utils/imageCompressor.js` | Membangun halaman chat interaktif, kartu pratinjau laporan yang bisa diedit via chat maupun klik langsung, upload foto opsional, serta endpoint Gemini 2.5 Flash hemat token. |
 | **Zikri** | **Geolocation, Nominatim OSM Queue & Peta Publik Leaflet** | `src/pages/PublicMapPage.jsx`, `src/components/map/PublicReportMap.jsx`, `src/hooks/useGeolocation.js`, `src/utils/geohashHelper.js`, `api/reverse-geocode.js`, `api/cleanup-audio.js` | Membangun fitur deteksi lokasi GPS, pemilih pin peta di chat, endpoint reverse geocoding dengan antrean 1 req/dtk & cache Geohash, serta peta publik ber-cluster. |
