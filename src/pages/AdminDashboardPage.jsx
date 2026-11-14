@@ -12,6 +12,7 @@ import ReportQueueTable from '../components/admin/ReportQueueTable.jsx';
 import ReportDetailModal from '../components/admin/ReportDetailModal.jsx';
 import RejectReasonModal from '../components/admin/RejectReasonModal.jsx';
 import ReportEditModal from '../components/admin/ReportEditModal.jsx';
+import PublicReportMap from '../components/map/PublicReportMap.jsx';
 
 function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('queue');
@@ -48,8 +49,8 @@ function AdminDashboardPage() {
       setStats({ total, pending, emergency, resolved });
     } catch (error) {
       console.error('Gagal memuat laporan admin:', error);
-      const errCode = error?.code || 'default';
-      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.default'));
+      const errCode = error?.code || 'UNKNOWN_ERROR';
+      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.UNKNOWN_ERROR'));
     } finally {
       setIsLoadingData(false);
     }
@@ -80,8 +81,8 @@ function AdminDashboardPage() {
       fetchReports();
     } catch (error) {
       console.error('Gagal memperbarui status laporan:', error);
-      const errCode = error?.code || 'default';
-      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.default'));
+      const errCode = error?.code || 'UNKNOWN_ERROR';
+      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.UNKNOWN_ERROR'));
     }
   };
 
@@ -93,15 +94,15 @@ function AdminDashboardPage() {
       fetchReports();
     } catch (error) {
       console.error('Gagal menolak laporan:', error);
-      const errCode = error?.code || 'default';
-      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.default'));
+      const errCode = error?.code || 'UNKNOWN_ERROR';
+      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.UNKNOWN_ERROR'));
     }
   };
 
   // Handler Hapus Laporan dengan konfirmasi (menggunakan teks admin.deleteConfirm)
   const handleDeleteReport = async (reportId) => {
-    const confirmMessage = t('admin.deleteConfirm') || 'Apakah Anda yakin ingin menghapus laporan ini?';
-    if (!window.confirm(confirmMessage)) return;
+    // Hapus bersifat permanen, jadi minta konfirmasi dulu
+    if (!window.confirm(t('admin.deleteConfirm'))) return;
 
     try {
       setErrorMessage(null);
@@ -109,8 +110,8 @@ function AdminDashboardPage() {
       fetchReports();
     } catch (error) {
       console.error('Gagal menghapus laporan:', error);
-      const errCode = error?.code || 'default';
-      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.default'));
+      const errCode = error?.code || 'UNKNOWN_ERROR';
+      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.UNKNOWN_ERROR'));
     }
   };
 
@@ -144,7 +145,7 @@ function AdminDashboardPage() {
         </div>
         <div className="flex items-center space-x-4">
           <span className="text-base text-[#D4D4D4] hidden sm:inline">
-            {adminUser?.email || 'admin@laporin.id'}
+            {adminUser?.email}
           </span>
           <button
             onClick={handleLogout}
@@ -243,8 +244,11 @@ function AdminDashboardPage() {
               )}
               {activeTab === 'map' && (
                 <div>
-                  <h2 className="text-lg font-semibold mb-2">{t('admin.tabMap')}</h2>
-                  <p className="text-base text-[#D4D4D4]">Peta interaktif Leaflet untuk pemantauan sebaran masalah.</p>
+                  <h2 className="text-lg font-semibold mb-4">{t('admin.tabMap')}</h2>
+                  {/* Peta semua laporan (termasuk yang belum diverifikasi); klik pin membuka detailnya */}
+                  <div className="h-[520px]">
+                    <PublicReportMap reports={reports} onSelectReport={setSelectedReportDetail} />
+                  </div>
                 </div>
               )}
             </>

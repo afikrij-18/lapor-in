@@ -125,7 +125,7 @@ export default function ReportQueueTable({ reports, onUpdateStatus, onDetail, on
                       {/* Tombol Edit */}
                       <button
                         onClick={() => onEdit && onEdit(report)}
-                        title="Edit"
+                        title={t('admin.edit')}
                         className="p-2 sm:px-2.5 sm:py-1.5 bg-[#171717] hover:bg-[#262626] text-[#FFFFFF] border border-[#D4D4D4]/30 rounded-lg text-xs font-medium inline-flex items-center justify-center cursor-pointer transition-colors"
                       >
                         <Edit3 size={15} />
@@ -134,7 +134,7 @@ export default function ReportQueueTable({ reports, onUpdateStatus, onDetail, on
                       {/* Tombol Hapus */}
                       <button
                         onClick={() => onDelete && onDelete(report.id)}
-                        title="Hapus"
+                        title={t('admin.delete')}
                         className="p-2 sm:px-2.5 sm:py-1.5 bg-[#171717] hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-medium inline-flex items-center justify-center cursor-pointer transition-colors"
                       >
                         <Trash2 size={15} />

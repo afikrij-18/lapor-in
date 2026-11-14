@@ -30,8 +30,8 @@ export function LanguageProvider({ children }) {
   useEffect(() => {
     let isActive = true;
 
-    // Langkah 1: Muat kamus teks dari folder public
-    fetch(`/locales/${LANGUAGE}.json`)
+    // Langkah 1: Muat kamus teks dari folder public dengan pencegahan cache basi
+    fetch(`/locales/${LANGUAGE}.json?v=${Date.now()}`, { cache: "no-store" })
       .then((response) => response.json())
       .then((loadedDictionary) => {
         // Langkah 2: Simpan kamus jika komponen masih terpasang
@@ -53,10 +53,19 @@ export function LanguageProvider({ children }) {
   }, []);
 
   const value = useMemo(() => {
-    // Fungsi penerjemah: mengembalikan teks, atau kuncinya jika teks tidak ditemukan
-    const t = (key, params) => {
+    // Fungsi penerjemah: mengembalikan teks, atau fallback/kuncinya jika teks tidak ditemukan
+    const t = (key, params, fallback) => {
       const text = findText(dictionary, key);
-      return typeof text === "string" ? fillParams(text, params) : key;
+      if (typeof text === "string") {
+        return typeof params === "object" && params !== null ? fillParams(text, params) : text;
+      }
+      if (typeof fallback === "string") {
+        return fallback;
+      }
+      if (typeof params === "string") {
+        return params;
+      }
+      return key;
     };
     return { language: LANGUAGE, t };
   }, [dictionary]);

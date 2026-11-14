@@ -9,7 +9,11 @@ import { createContext, useContext } from "react";
 // Nilai awal dipakai jika komponen berada di luar LanguageProvider
 export const LanguageContext = createContext({
   language: "id",
-  t: (key) => key
+  t: (key, params, fallback) => {
+    if (typeof fallback === "string") return fallback;
+    if (typeof params === "string") return params;
+    return key;
+  }
 });
 
 export function useLanguage() {

@@ -2,22 +2,20 @@
 
 import { useState } from 'react';
 import { X, Edit3, Save, AlertCircle } from 'lucide-react';
+import { useLanguage } from '../../hooks/useLanguage.js';
 import { updateReport } from '../../services/reportService.js';
 import { REPORT_CATEGORIES, URGENCY_LEVELS } from '../../config/constants.js';
 
 export default function ReportEditModal({ report, onClose, onUpdated }) {
-  // Normalisasi data kategori & urgensi (mendukung array maupun object)
-  const categoriesList = Array.isArray(REPORT_CATEGORIES) 
-    ? REPORT_CATEGORIES 
-    : REPORT_CATEGORIES ? Object.values(REPORT_CATEGORIES) : ['Infrastruktur', 'Fasilitas Umum', 'Keamanan', 'Lainnya'];
-  
-  const urgencyList = Array.isArray(URGENCY_LEVELS) 
-    ? URGENCY_LEVELS 
-    : URGENCY_LEVELS ? Object.values(URGENCY_LEVELS) : ['Normal', 'Tinggi', 'Darurat'];
+  const { t } = useLanguage();
+
+  // Pilihan diambil dari konstanta resmi: kategori berupa daftar, urgensi berupa objek
+  const categoriesList = REPORT_CATEGORIES;
+  const urgencyList = Object.values(URGENCY_LEVELS);
 
   const [title, setTitle] = useState(report?.title || '');
-  const [category, setCategory] = useState(report?.category || categoriesList[0] || 'Infrastruktur');
-  const [urgency, setUrgency] = useState(report?.urgency || urgencyList[0] || 'Normal');
+  const [category, setCategory] = useState(report?.category || categoriesList[0]);
+  const [urgency, setUrgency] = useState(report?.urgency || URGENCY_LEVELS.NORMAL);
   const [summary, setSummary] = useState(report?.summary || '');
   const [address, setAddress] = useState(report?.address || '');
   
@@ -46,14 +44,16 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
       onClose();
     } catch (error) {
       console.error('Gagal memperbarui laporan:', error);
-      setErrorMsg(error?.message || 'Gagal menyimpan perubahan laporan.');
+      // Pesan diambil dari kode error, bukan dari pesan teknis
+      const errorText = t(`errors.${error?.code || 'UNKNOWN_ERROR'}`);
+      setErrorMsg(errorText.startsWith('errors.') ? t('errors.UNKNOWN_ERROR') : errorText);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 text-base">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 text-base">
       <div className="bg-[#171717] border border-[#D4D4D4]/30 rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl text-[#FFFFFF] relative overflow-hidden">
         
         {/* Header Modal */}
@@ -63,8 +63,8 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
               <Edit3 size={22} />
             </div>
             <div>
-              <h3 className="text-xl font-bold">Edit Laporan</h3>
-              <span className="font-mono text-xs text-[#D4D4D4]">ID: {report.ticketCode || report.id.slice(0, 8)}</span>
+              <h3 className="text-xl font-bold">{t('admin.edit')}</h3>
+              <span className="font-mono text-xs text-[#D4D4D4]">{report.ticketCode || report.id.slice(0, 8)}</span>
             </div>
           </div>
           <button
@@ -87,7 +87,7 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
           {/* Judul Laporan */}
           <div>
             <label className="block text-xs uppercase tracking-wider text-[#D4D4D4] mb-2 font-semibold">
-              Judul Laporan
+              {t('report.title')}
             </label>
             <input
               type="text"
@@ -102,7 +102,7 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs uppercase tracking-wider text-[#D4D4D4] mb-2 font-semibold">
-                Kategori
+                {t('report.category')}
               </label>
               <select
                 value={category}
@@ -119,7 +119,7 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
 
             <div>
               <label className="block text-xs uppercase tracking-wider text-[#D4D4D4] mb-2 font-semibold">
-                Urgensi
+                {t('report.urgency')}
               </label>
               <select
                 value={urgency}
@@ -138,7 +138,7 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
           {/* Ringkasan */}
           <div>
             <label className="block text-xs uppercase tracking-wider text-[#D4D4D4] mb-2 font-semibold">
-              Ringkasan Masalah
+              {t('report.summary')}
             </label>
             <textarea
               rows={3}
@@ -152,7 +152,7 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
           {/* Alamat */}
           <div>
             <label className="block text-xs uppercase tracking-wider text-[#D4D4D4] mb-2 font-semibold">
-              Alamat Lokasi
+              {t('report.location')}
             </label>
             <input
               type="text"
@@ -170,7 +170,7 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
               onClick={onClose}
               className="px-5 py-2.5 bg-[#0A0A0A] hover:bg-[#262626] border border-[#D4D4D4]/30 text-[#FFFFFF] rounded-xl text-base font-medium transition-colors cursor-pointer"
             >
-              Batal
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -178,7 +178,7 @@ export default function ReportEditModal({ report, onClose, onUpdated }) {
               className="px-6 py-2.5 bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-50 text-[#FFFFFF] rounded-xl text-base font-semibold transition-colors inline-flex items-center space-x-2 cursor-pointer shadow-lg"
             >
               <Save size={18} />
-              <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+              <span>{isSubmitting ? t('common.loading') : t('common.save')}</span>
             </button>
           </div>
         </form>
