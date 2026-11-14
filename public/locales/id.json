@@ -58,7 +58,6 @@
     "typeInstead": "Ketik Laporan",
     "fillManually": "Isi Laporan Sendiri",
     "invalidReport": "Maaf, laporan Anda tidak terdengar jelas. Silakan rekam ulang atau ketik laporan Anda.",
-    "securityErrorCode": "Kode verifikasi: {code}",
     "invalidText":"Maaf, tulisan Anda belum dapat dipahami sebagai laporan. Silakan tulis kembali masalah yang ingin dilaporkan.",
     "ticketTitle": "Laporan Anda Terkirim",
     "ticketLabel": "Kode Tiket Pelacakan",
@@ -132,8 +131,7 @@
   },
   "errors": {
     "INVALID_INPUT": "Data yang dikirim belum lengkap atau tidak sesuai.",
-    "UNAUTHORIZED": "Anda tidak memiliki akses.",
-    "TURNSTILE_FAILED": "Verifikasi keamanan gagal. Silakan muat ulang halaman.",
+    "UNAUTHORIZED": "Sesi belum siap. Silakan muat ulang halaman.",
     "RATE_LIMITED": "Anda terlalu sering mengirim laporan. Silakan coba lagi nanti.",
     "AI_QUOTA_EXCEEDED": "Asisten sedang sibuk. Anda dapat mengisi laporan sendiri.",
     "AI_UNAVAILABLE": "Asisten sedang tidak tersedia. Silakan coba lagi.",

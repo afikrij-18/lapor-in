@@ -65,6 +65,22 @@ export function onAuthChange(callback) {
   return onAuthStateChanged(auth, callback);
 }
 
+// Mengambil tanda pengenal sesi (ID token) pengguna saat ini, untuk dikirim ke endpoint /api/*
+// lewat header "Authorization: Bearer <token>". Server memakainya untuk membatasi pemakaian
+// per pengguna. Mengembalikan "" jika sesi tidak bisa dibuat; server yang memutuskan penolakannya.
+export async function getIdToken() {
+  try {
+    // Langkah 1: Pastikan ada sesi (anonim atau admin)
+    const user = await signInAnonymouslySilent();
+
+    // Langkah 2: Ambil token; Firebase memperbaruinya sendiri jika hampir kedaluwarsa
+    return await user.getIdToken();
+  } catch (error) {
+    console.error("Error pada getIdToken:", error);
+    return "";
+  }
+}
+
 // Mengecek apakah pengguna adalah admin tunggal.
 export function isAdminUser(user) {
   return Boolean(user && user.email === ADMIN_EMAIL);

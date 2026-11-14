@@ -23,7 +23,6 @@ import PhotoUploadInput from "../components/chat/PhotoUploadInput.jsx";
 import ReportPreviewCard from "../components/chat/ReportPreviewCard.jsx";
 import { useLanguage } from "../hooks/useLanguage.js";
 import { useReportDraft } from "../hooks/useReportDraft.js";
-import { useTurnstileToken } from "../hooks/useTurnstileToken.js";
 import {
   processReport,
   reverseGeocode,
@@ -51,12 +50,6 @@ function ChatPageContent() {
     resetDraft,
   } = useReportDraft();
 
-  // Token Cloudflare Turnstile diambil dari penyedia di App.jsx. Widget sudah dipasang sejak
-  // halaman utama, jadi token biasanya sudah siap saat halaman chat dibuka.
-  const { takeToken: takeTurnstileToken, getLastErrorCode: getTurnstileErrorCode } =
-    useTurnstileToken();
-  // Kode error widget saat verifikasi keamanan gagal ("" jika tidak ada), untuk ditampilkan
-  const [turnstileErrorCode, setTurnstileErrorCode] = useState("");
 
   const [inputText, setInputText] = useState("");
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -125,12 +118,7 @@ function ChatPageContent() {
       setInvalidMessageKey("");
 
       try {
-        const token = await takeTurnstileToken();
-        const result = await processReport({
-          audioBlob,
-          textInput,
-          turnstileToken: token,
-        });
+        const result = await processReport({ audioBlob, textInput });
 
         // Alur gagal: AI menandai laporan tidak valid atau tidak terdengar jelas.
         // Draf TIDAK diisi, sehingga kartu pratinjau tidak tampil (PRD bagian 3, Alur Gagal)
@@ -154,7 +142,6 @@ function ChatPageContent() {
       } catch (error) {
         const code = error?.code || "AI_UNAVAILABLE";
         setProcessErrorCode(code);
-        setTurnstileErrorCode(code === "TURNSTILE_FAILED" ? getTurnstileErrorCode() || "-" : "");
         setProcessRetryCount((prev) => prev + 1);
         const errMsg = t(`errors.${code}`);
         addMessage("model", errMsg);
@@ -163,15 +150,7 @@ function ChatPageContent() {
         setIsProcessing(false);
       }
     },
-    [
-      addMessage,
-      getTurnstileErrorCode,
-      setIsProcessing,
-      speakText,
-      t,
-      takeTurnstileToken,
-      updateDraft,
-    ]
+    [addMessage, setIsProcessing, speakText, t, updateDraft]
   );
 
   // Langkah 3: Saat halaman dibuka, baca draf yang dimulai halaman utama lewat startDraft().
@@ -511,11 +490,6 @@ function ChatPageContent() {
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#DC2626]" />
               <span>{t(`errors.${processErrorCode}`)}</span>
             </div>
-            {turnstileErrorCode && (
-              <p className="mt-1 text-base text-[#0A0A0A]">
-                {t("chat.securityErrorCode", { code: turnstileErrorCode })}
-              </p>
-            )}
             <div className="mt-3 flex flex-wrap gap-2">
               {processRetryCount < 2 && (
                 <button

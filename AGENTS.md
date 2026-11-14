@@ -11,12 +11,12 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
 - **Runtime & Arsitektur**:
   - Node.js versi `^20.19.0` atau `>=22.12.0` (wajib untuk Vite 8).
   - Backend menggunakan **Vercel Serverless Functions** (`api/*.js`) berbasis **Node.js ESM** (`"type": "module"`).
-  - **Zero-Cost Architecture**: Seluruh layanan berjalan pada tier gratis Firebase, Vercel, OpenStreetMap Nominatim, Cloudflare Turnstile, dan Gemini API.
+  - **Zero-Cost Architecture**: Seluruh layanan berjalan pada tier gratis Firebase, Vercel, OpenStreetMap Nominatim, dan Gemini API.
 - **Frontend Stack**:
   - React `^19.3` (tanpa React Compiler), `react-router-dom` `^7.18`, Vite `^8.3` (`@vitejs/plugin-react` `^6.3`).
   - Styling menggunakan **Tailwind CSS v4** (`tailwindcss` `^4.3` + `@tailwindcss/vite`). Konfigurasi tema dan CSS Variables dilakukan langsung di `src/index.css`. **DILARANG membuat file `tailwind.config.js`**.
   - Peta interaktif menggunakan `leaflet` `^1.9.4`, `react-leaflet` `^5.0`, `leaflet.markercluster` `^1.5.3`, dan `ngeohash` `^0.6.4`.
-  - Anti-bot menggunakan `@marsidev/react-turnstile` `^1.6.3`.
+  - Anti-bot: **Cloudflare Turnstile TIDAK dipakai** (dihapus). Perlindungannya ada di server: batas permintaan AI per pengguna per jam lewat `api/_lib/requestGuard.js`. **DILARANG** mengimpor `@marsidev/react-turnstile`, walau package-nya masih tercantum di `package.json`.
 - **Backend & AI SDK**:
   - Client Firebase SDK: `firebase` `^13.3` (Auth dan Firestore). **Firebase Storage TIDAK dipakai** karena membutuhkan paket Blaze; foto dan rekaman disimpan di Firestore sebagai `Bytes`.
   - Server Firebase SDK: `firebase-admin` `^14.5` (verifikasi admin & cron cleanup).
@@ -34,7 +34,7 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
 2. **Bahasa Komentar (Comments)**:
    - Seluruh komentar penjelas di dalam kode (baik frontend maupun serverless `api/*.js`) **WAJIB menggunakan bahasa Indonesia** yang ramah pemula, komunikatif, dan memiliki nomor urut langkah:
      ```javascript
-     // Langkah 1: Validasi token Cloudflare Turnstile dari header request
+     // Langkah 1: Periksa sesi pengguna dan batas pemakaian lewat guardRequest
      // Langkah 2: Kirim rekaman audio ke Gemini 3.5 Flash dengan schema terkunci
      // Langkah 3: Kembalikan draf terstruktur ke frontend
      ```
@@ -55,7 +55,7 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
        });
      }
      ```
-   - **Kode Error Resmi yang Berlaku**: `INVALID_INPUT` (`400`), `UNAUTHORIZED` (`401`), `TURNSTILE_FAILED` (`403`), `RATE_LIMITED` (`429`), `AI_QUOTA_EXCEEDED` (`429`), `AI_UNAVAILABLE` (`502`), `GEOCODE_FAILED` (`502`), dan `INTERNAL_ERROR` (`500`).
+   - **Kode Error Resmi yang Berlaku**: `INVALID_INPUT` (`400`), `UNAUTHORIZED` (`401`), `RATE_LIMITED` (`429`), `AI_QUOTA_EXCEEDED` (`429`), `AI_UNAVAILABLE` (`502`), `GEOCODE_FAILED` (`502`), dan `INTERNAL_ERROR` (`500`).
    - Pada sisi frontend, `apiClient.js` mengubah balasan gagal menjadi `Error` dengan properti `error.code`. Komponen UI menentukan alur pemulihan dan teks pesan berdasarkan `error.code` dari `public/locales/id.json`, bukan dari string `message` server.
 
 ---
@@ -66,7 +66,7 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
    - File di dalam `src/pages/*` dan `src/components/*` **DILARANG KERAS** mengimpor atau memanggil Firestore maupun `fetch('/api/*')` secara langsung.
    - Seluruh akses data dan API **WAJIB** melewati fungsi kontrak pada `src/services/`:
      - `src/services/reportService.js`: `createReport`, `listPublicReports`, `listReportsForAdmin`, `getReportPrivate`, `getReportPhotoUrl`, `getReportAudioUrl`, `updateReport`, `updateReportStatus`, `deleteReport`.
-     - `src/services/authService.js`: `signInAnonymouslySilent`, `signInAdmin`, `signOutAdmin`, `onAuthChange`, `isAdminUser`.
+     - `src/services/authService.js`: `signInAnonymouslySilent`, `signInAdmin`, `signOutAdmin`, `onAuthChange`, `isAdminUser`, `getIdToken`.
      - `src/services/apiClient.js`: `processReport`, `sendChatMessage`, `reverseGeocode`. Dengan `VITE_USE_MOCK_API=true` di `.env.local` dan `npm run dev`, ketiganya membalas data contoh dari `src/services/apiMocks.js` tanpa memanggil `/api/*` (mode mock; tidak pernah aktif di build produksi).
    - Draf laporan dibaca dan diubah **hanya** lewat `useReportDraft()` (`src/hooks/useReportDraft.js`): `draft`, `inputMode`, `startDraft({ inputMode, audioBlob })`, `updateDraft(fields)`, `resetDraft()`. Halaman utama memanggil `startDraft(...)` lalu `navigate("/chat")`. **DILARANG** mengirim rekaman atau data laporan lewat state navigasi (`navigate(path, { state })`). Jika `/chat` dibuka saat `inputMode` bernilai `null`, warga dikembalikan ke halaman utama.
    - Teks antarmuka diambil lewat `useLanguage()` dari `src/hooks/useLanguage.js`.
@@ -85,7 +85,7 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
 1. **Autentikasi & Otorisasi**:
    - Warga pelapor menggunakan **Firebase Silent Anonymous Auth** (`signInAnonymouslySilent()`) di latar belakang tanpa form pendaftaran.
    - Hanya terdapat **1 akun Admin tunggal** (`admin@laporin.id`) dengan Custom Claim `admin: true`. Tidak ada fitur registrasi publik.
-   - Endpoint `POST /api/process-report` wajib memverifikasi token **Cloudflare Turnstile** ke `https://challenges.cloudflare.com/turnstile/v0/siteverify`. Komponen `TurnstileWidget` dipasang **satu kali** oleh `TurnstileProvider` di `App.jsx`; **DILARANG** memasangnya lagi di halaman atau komponen. Token diambil dengan `const { takeToken } = useTurnstileToken()` lalu `const token = await takeToken()`, dan diteruskan ke `processReport({ ..., turnstileToken: token })`. Token hanya berlaku sekali; `takeToken()` otomatis meminta token baru untuk pemanggilan berikutnya, termasuk "Coba Lagi".
+   - Endpoint yang memanggil Gemini (`POST /api/process-report` dan `POST /api/chat-assistant`) wajib memanggil `guardRequest` dari `api/_lib/requestGuard.js` sebelum membaca isi permintaan. Penjaga itu memeriksa header `Authorization: Bearer <idToken>` dan membatasi permintaan per pengguna per jam (bawaan 20 dan 60). Tanpa tanda pengenal yang sah: `401 UNAUTHORIZED`; melewati batas: `429 RATE_LIMITED`. Kesalahan pengaturan server (kunci service account tidak terbaca, Firestore gagal) **tidak boleh** memblokir warga: permintaan tetap diproses dan sebabnya dicatat di log.
    - Rekaman dikirim ke `POST /api/process-report` sebagai **JSON** berisi `audioBase64` dan `audioMimeType`. **DILARANG** memakai `multipart/form-data` (membutuhkan package pengurai di server).
    - Endpoint cron `GET /api/cleanup-audio` wajib memvalidasi header `Authorization: Bearer <CRON_SECRET>` dan selesai di bawah batas timeout Vercel Free Tier (`< 10 detik`).
 2. **Isolasi Data Publik vs Data Privat (`reports` vs `report_private`)**:
@@ -145,7 +145,7 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
 1. **Strategi Branching & Commit**:
    - **DILARANG** `git push` langsung ke branch `main`. Seluruh perubahan wajib melalui **Pull Request (PR)** dari branch kerja masing-masing anggota. Nama branch adalah nama anggota (huruf kecil); **DILARANG** membuat branch dengan nama lain:
      - `fikri` (Fikri — Project Lead, Scaffold, Firebase Core, Services, Rules, `id.json`)
-     - `irfan` (Irfan — Homepage UI, MicHeroButton, Audio Recorder, TTS, Navbar, TurnstileWidget)
+     - `irfan` (Irfan — Homepage UI, MicHeroButton, Audio Recorder, TTS, Navbar)
      - `nugi` (Nugi — ChatPage, Chat Components, ReportDraftContext, Gemini Endpoints, Image Compressor)
      - `zikri` (Zikri — PublicMapPage, Leaflet Map & Cluster, Geolocation, Geohash, Reverse Geocode & Cleanup Cron)
      - `taqi` (Taqi — AdminLoginPage, AdminDashboardPage, Admin Components, Ticket Generator)

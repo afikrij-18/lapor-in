@@ -15,6 +15,8 @@
 > Revisi kedua saat hackathon: rekaman dikirim ke `/api/process-report` sebagai base64 di dalam JSON, bukan `multipart/form-data` (8.2); batas keluaran menjadi 1024 untuk `process-report` dan 350 untuk `chat-assistant`, keduanya dengan `thinkingBudget: 0` (4.2); mode mock `VITE_USE_MOCK_API` ditambahkan (7.1, 7.4, 7.5); serah terima halaman utama ke halaman chat lewat `useReportDraft()`, dan widget Turnstile dipindah ke halaman chat (3, 7.5). File aturan agent bernama `AGENTS.md`.
 >
 > Revisi ketiga saat hackathon: model menjadi `gemini-3.5-flash` karena `gemini-2.5-flash` sudah tidak tersedia untuk API key baru; model cadangan, batas waktu per percobaan, dan pengecualian `thinkingBudget` untuk model lite ditetapkan (4.2). Seluruh sebutan "Gemini 2.5 Flash" di dokumen ini diganti.
+>
+> Revisi keempat saat hackathon: Cloudflare Turnstile dihapus dan diganti batas permintaan AI per pengguna per jam di server (3, 7.1, 7.2, 7.4, 7.5, 8.1, 8.2, glosarium). Alasannya: token Turnstile berikutnya butuh sekitar 20 detik untuk dibuat ulang, dan pengaturan kuncinya di Vercel berulang kali gagal. Catatan revisi di atas yang menyebut Turnstile adalah riwayat, bukan keadaan sekarang.
 
 ---
 
@@ -72,7 +74,7 @@ Antarmuka Lapor.in menggunakan skema kontras tinggi **Hitam, Merah, Putih** untu
 
 ### Langkah 1: Halaman Utama (Homepage - `/`)
 
-1. Pengguna membuka aplikasi Lapor.in. Sistem secara otomatis melakukan **Firebase Silent Anonymous Auth** di latar belakang. Widget **Cloudflare Turnstile** (tak terlihat) dipasang satu kali di tingkat aplikasi (`TurnstileProvider` di `App.jsx`), bukan di tiap halaman, sehingga token sudah siap sejak warga berada di halaman ini. Token hanya berlaku sekali; setiap kali terpakai, widget diminta membuat token baru, termasuk untuk tombol "Coba Lagi".
+1. Pengguna membuka aplikasi Lapor.in. Sistem secara otomatis melakukan **Firebase Silent Anonymous Auth** di latar belakang. Sesi anonim ini juga menjadi dasar perlindungan dari penyalahgunaan: server membatasi jumlah permintaan AI per pengguna per jam (bagian 8.1 dan 8.2). Cloudflare Turnstile tidak dipakai.
 2. Di tengah layar terdapat **Tombol Mikrofon Besar** berwarna Merah (`#DC2626`) bertuliskan *"Tekan & Ceritakan Masalah Anda"*.
 3. Tepat di bawah tombol mikrofon terdapat **Tombol Sekunder Input Manual** berwarna Putih berbingkai Hitam (`#0A0A0A`) bertuliskan *"Ketik Laporan Secara Manual"*.
 4. Pengguna memilih salah satu cara:
@@ -293,7 +295,9 @@ lapor.in/
 │   ├── process-report.js               # Endpoint transkripsi suara & triage awal Gemini
 │   ├── chat-assistant.js               # Endpoint percakapan panduan & edit laporan AI
 │   ├── reverse-geocode.js              # Endpoint proxy Nominatim OSM + throttling + cache
-│   └── cleanup-audio.js                # Endpoint cron penghapus rekaman audio > 30 hari
+│   ├── cleanup-audio.js                # Endpoint cron penghapus rekaman audio > 30 hari
+│   └── _lib/
+│       └── requestGuard.js             # Penjaga permintaan AI: sesi pengguna & batas per jam
 ├── public/
 │   ├── favicon.svg
 │   └── locales/
@@ -305,7 +309,7 @@ lapor.in/
 │   │   ├── common/
 │   │   │   ├── Navbar.jsx              # Header hitam/putih
 │   │   │   ├── Footer.jsx
-│   │   │   └── TurnstileWidget.jsx
+│   │   │   └── RequireAdmin.jsx        # Penjaga rute /admin
 │   │   ├── home/
 │   │   │   ├── MicHeroButton.jsx       # Tombol mikrofon besar #DC2626 + Web Audio API
 │   │   │   └── ManualInputBtn.jsx
@@ -370,7 +374,7 @@ lapor.in/
 | **Backend SDK (Client)** | `firebase` | `^13.3` | Firebase Auth dan Firestore (Firebase Storage tidak dipakai karena butuh paket Blaze) |
 | **Maps** | `leaflet`, `react-leaflet`, `leaflet.markercluster` | `^1.9.4` / `^5.0` / `^1.5.3` | Peta interaktif OpenStreetMap & clustering |
 | **Geohash** | `ngeohash` | `^0.6.4` | Enkode koordinat lat/lng ke string geohash presisi 7-8 |
-| **Anti-Bot** | `@marsidev/react-turnstile` | `^1.6.3` | Komponen Cloudflare Turnstile transparan |
+| **Anti-Bot** | (tanpa library) | - | Batas permintaan per pengguna di server (`api/_lib/requestGuard.js`). Package `@marsidev/react-turnstile` masih tercantum di `package.json` tetapi tidak dipakai |
 | **Server AI SDK** | `@google/genai` | `^3.3` | Pemanggilan model `gemini-3.5-flash` (tier gratis) di `/api/*` |
 | **Server Firebase** | `firebase-admin` | `^14.5` | Verifikasi token admin & cron cleanup di server |
 | **Linting** | `eslint`, `@eslint/js`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `globals` | `^10.14` / `^10.0` / `^7.1` / `^0.5` / `^17.13` | Pemeriksaan kode lewat `npm run lint` |
@@ -443,11 +447,10 @@ export const INITIAL_REPORT_DRAFT = {
   - `VITE_FIREBASE_PROJECT_ID`
   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
   - `VITE_FIREBASE_APP_ID`
-  - `VITE_TURNSTILE_SITE_KEY`
   - `VITE_USE_MOCK_API` (`"true"` atau `"false"`; mode mock, lihat bagian 7.5. Hanya berlaku saat `npm run dev`)
 - **Backend Serverless (Rahasia Server):**
   - `GEMINI_API_KEY` (dua key terpisah dengan nama variabel yang sama: key development untuk `.env.local` dan environment Preview/Development di Vercel, key demo hanya untuk environment Production, agar kuota demo tidak terpakai saat pengembangan)
-  - `TURNSTILE_SECRET_KEY`
+  - `AI_REPORT_LIMIT_PER_HOUR` dan `AI_CHAT_LIMIT_PER_HOUR` (opsional; batas permintaan AI per pengguna per jam, bawaan 20 dan 60)
   - `FIREBASE_SERVICE_ACCOUNT_JSON`
   - `OSM_CONTACT_EMAIL`
   - `CRON_SECRET` (di PDF tertulis lepas di akhir dokumen; dipakai Endpoint 4)
@@ -483,12 +486,13 @@ URL sementara dari `getReportPhotoUrl` dan `getReportAudioUrl` dibuat dengan `UR
 | `signOutAdmin()` | tidak ada | tidak ada | Setelah logout, aplikasi kembali ke sesi anonim. |
 | `onAuthChange(callback)` | `callback(user)` | fungsi `unsubscribe` | Satu-satunya fungsi yang tidak `async`. |
 | `isAdminUser(user)` | `user` | boolean | `true` jika email pengguna adalah `admin@laporin.id`. |
+| `getIdToken()` | tidak ada | string | Tanda pengenal sesi untuk header `Authorization` ke `/api/*`; string kosong jika sesi gagal dibuat. Dipakai `apiClient.js`. |
 
 #### `apiClient.js`
 
 | Fungsi | Parameter | Nilai Kembalian | Endpoint |
 |---|---|---|---|
-| `processReport({ audioBlob, textInput, turnstileToken })` | salah satu dari `audioBlob` atau `textInput` wajib ada | `{ draft, aiMessage }` | `POST /api/process-report` |
+| `processReport({ audioBlob, textInput })` | salah satu dari `audioBlob` atau `textInput` wajib ada | `{ draft, aiMessage }` | `POST /api/process-report` |
 | `sendChatMessage({ userMessage, currentDraft, recentHistory })` | sesuai Request JSON Endpoint 2 | `{ updatedFields, aiMessage }` | `POST /api/chat-assistant` |
 | `reverseGeocode(latitude, longitude)` | number, number | `{ address, geohash, source }` | `GET /api/reverse-geocode` |
 
@@ -510,7 +514,7 @@ Aturan serah terima:
 
 - Halaman utama **tidak** mengirim data lewat state navigasi; ia memanggil `startDraft(...)` lalu `navigate("/chat")`.
 - Jika `/chat` dibuka saat `inputMode` bernilai `null` (misalnya setelah halaman dimuat ulang), warga dikembalikan ke halaman utama.
-- Token Turnstile tidak ikut diserahterimakan. Halaman chat mengambilnya lewat `const { takeToken } = useTurnstileToken()` (`src/hooks/useTurnstileToken.js`), lalu meneruskannya ke `processReport`. `takeToken()` mengembalikan Promise berisi token; jika widget belum selesai, ia menunggu paling lama 15 detik. Halaman dan komponen tidak memasang `TurnstileWidget` sendiri.
+- `processReport` dan `sendChatMessage` otomatis menyertakan tanda pengenal sesi pengguna (header `Authorization`, diambil lewat `getIdToken()` di `authService.js`). Halaman tidak perlu mengurus token apa pun.
 
 ---
 
@@ -586,14 +590,18 @@ Document ID menggunakan string `geohash` presisi 7 (contoh: `"w22z9x4"`):
 | `address` | `string` | Alamat hasil reverse geocoding (kelurahan/jalan umum tanpa nomor rumah) |
 | `cachedAt` | `timestamp` | Waktu penyimpanan cache (masa berlaku 30 hari) |
 
-#### Koleksi 6: `rate_limits` (Pembatasan Anti-Spam)
+#### Koleksi 6: `rate_limits` (Batas Permintaan AI per Pengguna)
 
-Document ID menggunakan hash IP atau `reporterUid`:
+Pengganti Cloudflare Turnstile. Document ID adalah UID pengguna (termasuk sesi anonim). Hanya ditulis server lewat `api/_lib/requestGuard.js`; browser tidak punya akses. Tiap dokumen memuat dua penghitung:
 
 | Nama Field | Tipe Data | Keterangan |
 |---|---|---|
-| `count` | `number` | Jumlah laporan dalam 1 jam terakhir (maksimal `5`) |
-| `windowStart` | `timestamp` | Awal jendela waktu 1 jam |
+| `report.count` | `number` | Jumlah panggilan `/api/process-report` dalam jendela berjalan (bawaan maksimal `20` per jam) |
+| `report.windowStart` | `number` | Awal jendela satu jam, dalam milidetik |
+| `chat.count` | `number` | Jumlah panggilan `/api/chat-assistant` dalam jendela berjalan (bawaan maksimal `60` per jam) |
+| `chat.windowStart` | `number` | Awal jendela satu jam, dalam milidetik |
+
+Angkanya lebih longgar daripada "5 laporan per jam" di PRD awal, karena yang dihitung adalah panggilan AI (termasuk percobaan tidak valid dan "Coba Lagi"), bukan laporan terkirim. Batas dapat diubah lewat `AI_REPORT_LIMIT_PER_HOUR` dan `AI_CHAT_LIMIT_PER_HOUR`.
 
 ### 8.2 Spesifikasi Lengkap API Endpoints (`/api/*`)
 
@@ -618,9 +626,8 @@ Setiap endpoint yang gagal membalas dengan status HTTP `4xx` atau `5xx` dan satu
 | `code` | Status HTTP | Arti |
 |---|---|---|
 | `INVALID_INPUT` | `400` | Payload kosong, salah format, atau rekaman melebihi 120 detik |
-| `TURNSTILE_FAILED` | `403` | Token Cloudflare Turnstile tidak valid |
-| `UNAUTHORIZED` | `401` | `CRON_SECRET` salah (Endpoint 4) |
-| `RATE_LIMITED` | `429` | Batas laporan per jam terlampaui |
+| `UNAUTHORIZED` | `401` | Tanda pengenal sesi tidak ada atau tidak sah (Endpoint 1 dan 2), atau `CRON_SECRET` salah (Endpoint 4) |
+| `RATE_LIMITED` | `429` | Batas permintaan AI per pengguna per jam terlampaui |
 | `AI_QUOTA_EXCEEDED` | `429` | Kuota Gemini habis |
 | `AI_UNAVAILABLE` | `502` | Gemini gagal atau timeout |
 | `GEOCODE_FAILED` | `502` | Nominatim gagal atau timeout |
@@ -629,7 +636,7 @@ Setiap endpoint yang gagal membalas dengan status HTTP `4xx` atau `5xx` dan satu
 #### Endpoint 1: `POST /api/process-report`
 
 - **Fungsi:** Memproses input pertama warga (file audio rekaman atau teks manual) menjadi draf laporan terstruktur menggunakan Gemini 3.5 Flash.
-- **Headers:** `Content-Type: application/json` (untuk audio maupun teks), `x-turnstile-token: <token>`.
+- **Headers:** `Content-Type: application/json` (untuk audio maupun teks), `Authorization: Bearer <idToken>` (tanda pengenal sesi Firebase, termasuk sesi anonim).
 - **Request Payload (JSON):**
   - `audioBase64` (String, opsional jika `textInput` ada): isi rekaman dalam base64, tanpa awalan `data:`. Rekaman maksimal 120 detik (sekitar 360 KB, menjadi sekitar 480 KB setelah base64). `multipart/form-data` tidak dipakai karena membutuhkan package pengurai di server.
   - `audioMimeType` (String, wajib jika `audioBase64` ada): misalnya `"audio/webm;codecs=opus"` atau `"audio/mp4"`.
@@ -637,7 +644,7 @@ Setiap endpoint yang gagal membalas dengan status HTTP `4xx` atau `5xx` dan satu
   - Endpoint ini tidak menyimpan audio; penyimpanan dilakukan frontend saat laporan dikirim.
   - `language` (`"id"`; `"en"` menyusul apabila bahasa Inggris dikerjakan)
 - **Proses Backend:**
-  1. Verifikasi token Cloudflare Turnstile ke `https://challenges.cloudflare.com/turnstile/v0/siteverify`.
+  1. Jalankan penjaga permintaan (`api/_lib/requestGuard.js`): periksa tanda pengenal sesi, lalu hitung pemakaian pengguna di `rate_limits`. Tanpa tanda pengenal yang sah dibalas `401 UNAUTHORIZED`; melewati batas dibalas `429 RATE_LIMITED`. Jika kunci service account tidak terbaca atau Firestore gagal, permintaan tetap diproses dan sebabnya dicatat di log, agar kesalahan pengaturan server tidak memblokir warga. Endpoint 2 (`chat-assistant`) memakai penjaga yang sama.
   2. Kirim audio/teks ke Gemini 3.5 Flash dengan `responseSchema` terkunci, `maxOutputTokens: 1024`, `thinkingBudget: 0`, dan instruksi normalisasi dialek & gangguan bicara. Audio diteruskan ke Gemini sebagai data inline (base64 dan MIME type dari payload).
 - **Response JSON (`200 OK`):**
 
@@ -817,7 +824,7 @@ Foto disimpan setelah melewati `imageCompressor.js`, yang menggambar ulang gamba
 | Anggota | Peran & Fokus Modul | File & Folder Tanggung Jawab Utama | Deliverables Wajib |
 |---|---|---|---|
 | **Fikri** | **Project Lead, Scaffold Project, Firebase Core, Auth & Security Rules** | `src/config/firebase.js`, `src/config/constants.js`, `src/services/authService.js`, `src/services/reportService.js`, `src/services/apiClient.js`, `src/context/LanguageContext.jsx`, `src/App.jsx`, `src/main.jsx`, `src/index.css`, `src/components/common/Footer.jsx`, `firestore.rules`, `firebase.json`, `vercel.json`, `package.json`, `.env.example`, `eslint.config.js`, `public/locales/id.json` | Setup repo GitHub & Vercel, scaffold project (routing semua halaman di `App.jsx`, konfigurasi Tailwind & CSS Variables, `apiClient`), inisialisasi Firebase (Silent Auth + Akun `admin@laporin.id`), deployment Security Rules, dan kamus teks antarmuka `id.json`. |
-| **Irfan** | **Homepage UI, Web Audio Recorder & Aksesibilitas Suara** | `src/pages/HomePage.jsx`, `src/components/home/*`, `src/hooks/useAudioRecorder.js`, `src/hooks/useSpeechSynthesis.js`, `src/components/common/Navbar.jsx`, `src/components/common/TurnstileWidget.jsx` | Membangun Homepage palet Hitam-Merah-Putih, tombol mikrofon besar `#DC2626`, tombol ketik manual, perekaman suara *noise-suppressed*, dan fitur TTS pembaca balasan AI. |
+| **Irfan** | **Homepage UI, Web Audio Recorder & Aksesibilitas Suara** | `src/pages/HomePage.jsx`, `src/components/home/*`, `src/hooks/useAudioRecorder.js`, `src/hooks/useSpeechSynthesis.js`, `src/components/common/Navbar.jsx` | Membangun Homepage palet Hitam-Merah-Putih, tombol mikrofon besar `#DC2626`, tombol ketik manual, perekaman suara *noise-suppressed*, dan fitur TTS pembaca balasan AI. |
 | **Nugi** | **Halaman Chat Interaktif, Integrasi Gemini AI & Fitur Edit Laporan** | `src/pages/ChatPage.jsx`, `src/components/chat/*`, `src/context/ReportDraftContext.jsx`, `api/process-report.js`, `api/chat-assistant.js`, `src/utils/imageCompressor.js` | Membangun halaman chat interaktif, kartu pratinjau laporan yang bisa diedit via chat maupun klik langsung, upload foto opsional, serta endpoint Gemini 3.5 Flash hemat token. |
 | **Zikri** | **Geolocation, Nominatim OSM Queue & Peta Publik Leaflet** | `src/pages/PublicMapPage.jsx`, `src/components/map/PublicReportMap.jsx`, `src/hooks/useGeolocation.js`, `src/utils/geohashHelper.js`, `api/reverse-geocode.js`, `api/cleanup-audio.js` | Membangun fitur deteksi lokasi GPS, pemilih pin peta di chat, endpoint reverse geocoding dengan antrean 1 req/dtk & cache Geohash, serta peta publik ber-cluster. |
 | **Taqi** | **Dashboard Admin Tunggal & Alur Verifikasi Laporan** | `src/pages/AdminLoginPage.jsx`, `src/pages/AdminDashboardPage.jsx`, `src/components/admin/*`, `src/utils/ticketGenerator.js` | Membangun halaman login khusus `admin@laporin.id`, tabel antrean verifikasi laporan, highlight merah darurat, modal edit koreksi admin, dan tombol ubah status laporan. |
@@ -829,7 +836,7 @@ Foto disimpan setelah melewati `imageCompressor.js`, yang menggambar ulang gamba
 | Istilah | Definisi dalam Konteks Project Lapor.in |
 |---|---|
 | **Anonymous Auth (Silent Auth)** | Metode autentikasi Firebase yang membuatkan identitas sesi (`UID`) secara otomatis di latar belakang tanpa meminta warga mendaftar akun, mengisi email, atau membuat kata sandi. |
-| **Cloudflare Turnstile** | Layanan verifikasi keamanan anti-bot gratis yang bekerja secara transparan di latar belakang browser tanpa memaksa pengguna memilih gambar lampu lalu lintas atau teka-teki. |
+| **Batas Permintaan per Pengguna** | Perlindungan dari penyalahgunaan endpoint AI: server memeriksa sesi Firebase pengguna dan membatasi jumlah permintaannya per jam. Menggantikan Cloudflare Turnstile, yang dihapus saat hackathon. |
 | **Disfluency Normalization** | Proses pembersihan transkrip suara oleh AI untuk merapikan pengulangan suku kata, jeda panjang, atau artikulasi terbata (seperti pada pengguna gagap) menjadi kalimat yang utuh dan mudah dipahami. |
 | **Geohash** | Sistem pengkodean koordinat geografis (`latitude` dan `longitude`) menjadi rangkaian huruf dan angka pendek (presisi 7 karakter mencakup area sekitar `150m x 150m`) untuk efisiensi cache alamat dan pengelompokan pin peta. |
 | **Marker Clustering** | Teknik penggabungan beberapa pin laporan yang berdekatan di peta Leaflet.js menjadi satu lingkaran angka agar tampilan peta tetap bersih dan tidak menumpuk. |

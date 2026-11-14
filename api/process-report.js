@@ -1,5 +1,5 @@
 // Vercel Serverless Function: POST /api/process-report
-// Memproses rekaman suara atau ketikan awal warga menjadi draf laporan terstruktur via Gemini 2.5 Flash.
+// Memproses rekaman suara atau ketikan awal warga menjadi draf laporan terstruktur via Gemini 3.5 Flash.
 
 import { GoogleGenAI, Type } from "@google/genai";
 import {
@@ -9,6 +9,7 @@ import {
   REPORT_CATEGORIES,
   URGENCY_LEVELS,
 } from "../src/config/constants.js";
+import { guardRequest } from "./_lib/requestGuard.js";
 
 const ALLOWED_URGENCIES = Object.values(URGENCY_LEVELS);
 
@@ -94,52 +95,6 @@ async function parseJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
-// Memverifikasi token Cloudflare Turnstile ke server Cloudflare
-async function verifyTurnstile(token, remoteIp) {
-  const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  if (!secretKey) {
-    // Tanpa secret key: di laptop verifikasi dilewati, di produksi semua permintaan ditolak
-    if (process.env.NODE_ENV === "production") {
-      console.error(
-        "Turnstile gagal: TURNSTILE_SECRET_KEY belum diisi di environment variable server"
-      );
-      return false;
-    }
-    return true;
-  }
-  if (!token) {
-    // Token kosong berarti widget Turnstile di halaman chat tidak menghasilkan token
-    console.error("Turnstile gagal: token kosong (widget di browser tidak mengeluarkan token)");
-    return false;
-  }
-
-  try {
-    const formData = new URLSearchParams();
-    formData.append("secret", secretKey);
-    formData.append("response", token);
-    if (remoteIp) {
-      formData.append("remoteip", remoteIp);
-    }
-
-    const verifyResponse = await fetch(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-    const result = await verifyResponse.json();
-    if (!result.success) {
-      // Kode error dari Cloudflare hanya dicatat di log server, tidak dikirim ke warga
-      console.error("Turnstile gagal: token ditolak Cloudflare:", result["error-codes"]);
-    }
-    return Boolean(result.success);
-  } catch (error) {
-    console.error("Error pada verifikasi Cloudflare Turnstile:", error);
-    return false;
-  }
-}
-
 // Format rekaman yang diterima (PRD bagian 4.1): WebM, MP4, atau OGG
 const ALLOWED_AUDIO_MIME_TYPES = ["audio/webm", "audio/mp4", "audio/ogg"];
 
@@ -149,20 +104,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Langkah 1: Validasi token anti-bot Cloudflare Turnstile
-    const turnstileToken = req.headers["x-turnstile-token"];
-    const clientIp =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.socket?.remoteAddress;
-
-    const isVerified = await verifyTurnstile(turnstileToken, clientIp);
-    if (!isVerified) {
-      return sendError(
-        res,
-        403,
-        "TURNSTILE_FAILED",
-        "Verifikasi keamanan gagal. Silakan muat ulang halaman."
-      );
+    // Langkah 1: Periksa sesi pengguna dan batas pemakaian per jam (pengganti Turnstile)
+    const guard = await guardRequest(req, {
+      bucket: "report",
+      envName: "AI_REPORT_LIMIT_PER_HOUR",
+      defaultLimit: 20,
+    });
+    if (!guard.allowed) {
+      return sendError(res, guard.status, guard.code, guard.message);
     }
 
     // Langkah 2: Ambil dan validasi input dari body JSON (PRD bagian 8.2).

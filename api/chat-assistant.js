@@ -8,6 +8,7 @@ import {
   REPORT_CATEGORIES,
   URGENCY_LEVELS,
 } from "../src/config/constants.js";
+import { guardRequest } from "./_lib/requestGuard.js";
 
 const ALLOWED_URGENCIES = Object.values(URGENCY_LEVELS);
 
@@ -84,6 +85,16 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Langkah 0: Periksa sesi pengguna dan batas pemakaian per jam
+    const guard = await guardRequest(req, {
+      bucket: "chat",
+      envName: "AI_CHAT_LIMIT_PER_HOUR",
+      defaultLimit: 60,
+    });
+    if (!guard.allowed) {
+      return sendError(res, guard.status, guard.code, guard.message);
+    }
+
     // Langkah 1: Validasi payload pesan warga
     const body = await parseJsonBody(req);
     const userMessage = typeof body.userMessage === "string" ? body.userMessage.trim() : "";

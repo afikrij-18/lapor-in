@@ -3,6 +3,7 @@
 
 import { CLIENT_ERROR_CODES, createAppError } from "../utils/appError.js";
 import { mockProcessReport, mockReverseGeocode, mockSendChatMessage } from "./apiMocks.js";
+import { getIdToken } from "./authService.js";
 
 // Bahasa antarmuka saat ini. "en" menyusul apabila bahasa Inggris dikerjakan.
 const LANGUAGE = "id";
@@ -42,6 +43,16 @@ async function request(path, options) {
   return body;
 }
 
+// Menyusun header untuk endpoint yang memanggil AI. Server memeriksa tanda pengenal sesi ini
+// dan membatasi jumlah permintaan per pengguna per jam (pengganti Turnstile).
+async function buildAiHeaders() {
+  const idToken = await getIdToken();
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${idToken}`
+  };
+}
+
 // Mengubah Blob rekaman menjadi teks base64 (tanpa awalan "data:...;base64,").
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -57,7 +68,7 @@ function blobToBase64(blob) {
 
 // Memproses input pertama warga menjadi draf laporan (POST /api/process-report).
 // Salah satu dari audioBlob atau textInput wajib ada. Mengembalikan { draft, aiMessage }.
-export async function processReport({ audioBlob, textInput, turnstileToken }) {
+export async function processReport({ audioBlob, textInput }) {
   // Langkah 1: Tolak pemanggilan tanpa isi
   if (!audioBlob && !textInput) {
     throw createAppError(CLIENT_ERROR_CODES.INVALID_INPUT);
@@ -87,10 +98,7 @@ export async function processReport({ audioBlob, textInput, turnstileToken }) {
   // Langkah 3: Kirim dan kembalikan bagian yang dipakai halaman chat
   const result = await request("/api/process-report", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-turnstile-token": turnstileToken || ""
-    },
+    headers: await buildAiHeaders(),
     body: JSON.stringify(payload)
   });
   return { draft: result.draft, aiMessage: result.aiMessage };
@@ -105,7 +113,7 @@ export async function sendChatMessage({ userMessage, currentDraft, recentHistory
 
   const result = await request("/api/chat-assistant", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await buildAiHeaders(),
     body: JSON.stringify({
       userMessage,
       currentDraft,
