@@ -99,3 +99,31 @@
     animation: none;
   }
 }
+
+/* ---------- Halaman utama ---------- */
+
+/* Garis gelombang latar: tiap garis digeser sejauh satu periodenya (--wave-shift) tanpa henti.
+   Kecepatannya dinaikkan dari HomePage.jsx saat mikrofon sedang merekam. */
+@keyframes home-wave-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--wave-shift));
+  }
+}
+
+.home-wave {
+  animation: home-wave-drift var(--wave-duration, 30s) linear infinite;
+}
+
+.home-wave-reverse {
+  animation-direction: reverse;
+}
+
+/* Pengguna yang meminta gerakan dikurangi melihat garis yang diam */
+@media (prefers-reduced-motion: reduce) {
+  .home-wave {
+    animation: none;
+  }
+}

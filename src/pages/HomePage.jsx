@@ -3,7 +3,7 @@
 // Sesuai PRD bagian 1, 2, 3 (Langkah 1), dan 4.1.
 // Desain berwibawa, bersih, tanpa badge berlebih (anti-AI slop), fokus pada aksi utama pelaporan warga.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Volume2,
@@ -19,6 +19,37 @@ import { useAudioRecorder } from '../hooks/useAudioRecorder.js';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis.js';
 import { useLanguage } from '../hooks/useLanguage.js';
 import { useReportDraft } from '../hooks/useReportDraft.js';
+
+// Lebar kanvas SVG latar (sama dengan viewBox)
+const WAVE_CANVAS_WIDTH = 1440;
+
+// Enam garis gelombang latar. period = panjang satu lekuk; duration = detik per putaran;
+// reverse = bergerak ke kanan. Nilainya sengaja berbeda agar garis tidak bergerak serempak.
+const WAVE_LINES = [
+  { y: 460, period: 820, duration: 30, reverse: false, stroke: 'rgba(220, 38, 38, 0.18)', width: 1.5 },
+  { y: 490, period: 760, duration: 38, reverse: true, stroke: 'rgba(212, 212, 212, 0.10)', width: 1 },
+  { y: 430, period: 880, duration: 26, reverse: false, stroke: 'rgba(220, 38, 38, 0.14)', width: 1.2, dashed: true },
+  { y: 520, period: 700, duration: 46, reverse: true, stroke: 'rgba(212, 212, 212, 0.08)', width: 1 },
+  { y: 400, period: 960, duration: 34, reverse: false, stroke: 'rgba(212, 212, 212, 0.06)', width: 1 },
+  { y: 370, period: 840, duration: 22, reverse: true, stroke: 'rgba(220, 38, 38, 0.10)', width: 1 },
+];
+
+// Kecepatan gerak garis: biasa, dan saat mikrofon sedang merekam
+const WAVE_SPEED_IDLE = 1;
+const WAVE_SPEED_RECORDING = 3.5;
+
+// Menyusun kurva dari lekuk-lekuk yang identik dan berulang. Kurva dilebihkan satu periode di kiri
+// dan dua di kanan, sehingga saat digeser sejauh satu periode tidak pernah terlihat ujungnya.
+// Mengembalikan { d, segmentCount }.
+function buildWavePath(y, period, amplitude = 120) {
+  const segmentCount = Math.ceil((WAVE_CANVAS_WIDTH + period * 3) / period);
+  let d = `M ${-period} ${y}`;
+  for (let index = 0; index < segmentCount; index += 1) {
+    const startX = -period + index * period;
+    d += ` C ${startX + period / 3} ${y - amplitude}, ${startX + (period * 2) / 3} ${y + amplitude}, ${startX + period} ${y}`;
+  }
+  return { d, segmentCount };
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -45,6 +76,22 @@ export default function HomePage() {
   } = useAudioRecorder({
     onLimitReached: goToChatWithAudio,
   });
+
+  // Langkah 2b: Garis gelombang latar mengalir lebih cepat saat merekam, seolah ikut mendengarkan.
+  // updatePlaybackRate mengubah kecepatan dengan mulus; mengganti durasi lewat CSS membuat garis melompat.
+  const wavesRef = useRef(null);
+  useEffect(() => {
+    const wavesElement = wavesRef.current;
+    if (!wavesElement || typeof wavesElement.getAnimations !== 'function') {
+      return;
+    }
+    const speed = isRecording ? WAVE_SPEED_RECORDING : WAVE_SPEED_IDLE;
+    wavesElement.getAnimations({ subtree: true }).forEach((animation) => {
+      if (typeof animation.updatePlaybackRate === 'function') {
+        animation.updatePlaybackRate(speed);
+      }
+    });
+  }, [isRecording]);
 
   // Langkah 3: Handler klik tombol mikrofon utama
   const handleMicClick = async () => {
@@ -117,49 +164,36 @@ export default function HomePage() {
         aria-hidden="true"
       >
         <svg
-          className="w-full h-full min-w-[1000px] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-70"
+          ref={wavesRef}
+          className={`w-full h-full min-w-[1000px] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-700 ${
+            isRecording ? 'opacity-100' : 'opacity-70'
+          }`}
           viewBox="0 0 1440 800"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           preserveAspectRatio="xMidYMid slice"
         >
-          {/* Gelombang 1: Aksen Kontur Merah Halus */}
-          <path
-            d="M-100 460 C 240 340, 480 580, 720 460 C 960 340, 1200 580, 1540 460"
-            stroke="rgba(220, 38, 38, 0.18)"
-            strokeWidth="1.5"
-          />
-          {/* Gelombang 2: Garis Kontur Abu-abu Halus */}
-          <path
-            d="M-100 490 C 280 370, 520 610, 720 490 C 920 370, 1160 610, 1540 490"
-            stroke="rgba(212, 212, 212, 0.10)"
-            strokeWidth="1"
-          />
-          {/* Gelombang 3: Garis Harmonik Putus-putus Merah */}
-          <path
-            d="M-100 430 C 200 310, 440 550, 720 430 C 1000 310, 1240 550, 1540 430"
-            stroke="rgba(220, 38, 38, 0.14)"
-            strokeWidth="1.2"
-            strokeDasharray="6 8"
-          />
-          {/* Gelombang 4: Kontur Rendah Abu-abu Netral */}
-          <path
-            d="M-100 520 C 320 400, 560 640, 720 520 C 880 400, 1120 640, 1540 520"
-            stroke="rgba(212, 212, 212, 0.08)"
-            strokeWidth="1"
-          />
-          {/* Gelombang 5: Kontur Tinggi Tipis */}
-          <path
-            d="M-100 400 C 160 280, 400 520, 720 400 C 1040 280, 1280 520, 1540 400"
-            stroke="rgba(212, 212, 212, 0.06)"
-            strokeWidth="1"
-          />
-          {/* Gelombang 6: Garis Aliran Sekunder Merah */}
-          <path
-            d="M-100 370 C 220 250, 460 490, 720 370 C 980 250, 1220 490, 1540 370"
-            stroke="rgba(220, 38, 38, 0.10)"
-            strokeWidth="1"
-          />
+          {/* Tiap garis digeser sejauh satu periode tanpa henti (kelas home-wave di src/index.css).
+              Karena bentuknya berulang, putarannya tidak terlihat. */}
+          {WAVE_LINES.map((line) => {
+            const { d, segmentCount } = buildWavePath(line.y, line.period);
+            return (
+              <g
+                key={line.y}
+                className={line.reverse ? 'home-wave home-wave-reverse' : 'home-wave'}
+                style={{ '--wave-shift': `-${line.period}px`, '--wave-duration': `${line.duration}s` }}
+              >
+                <path
+                  d={d}
+                  stroke={line.stroke}
+                  strokeWidth={line.width}
+                  // pathLength membuat pola putus-putus tepat berulang tiap periode (420 habis dibagi 3 + 4)
+                  pathLength={line.dashed ? segmentCount * 420 : undefined}
+                  strokeDasharray={line.dashed ? '3 4' : undefined}
+                />
+              </g>
+            );
+          })}
         </svg>
       </div>
 
