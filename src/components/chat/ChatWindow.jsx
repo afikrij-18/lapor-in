@@ -20,7 +20,7 @@ export default function ChatWindow({
   }, [messages, isProcessing]);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#F5F5F5] px-4 py-5">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-[#F5F5F5] px-4 py-5 [scrollbar-gutter:stable_both-edges]">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
         {/* Langkah 2: Render seluruh gelembung pesan */}
         {messages.map((msg) => (

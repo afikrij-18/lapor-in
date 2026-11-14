@@ -5,13 +5,10 @@ import { Navigate, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowLeft,
-  Camera,
   CheckCircle2,
   Edit3,
   Loader2,
-  MapPin,
   Mic,
-  Navigation,
   RefreshCw,
   Send,
   Volume2,
@@ -53,7 +50,6 @@ function ChatPageContent() {
 
   const [inputText, setInputText] = useState("");
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [showPhotoBox, setShowPhotoBox] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -136,7 +132,6 @@ function ChatPageContent() {
           audioBlob: audioBlob || null,
         });
 
-        setShowPhotoBox(true);
         addMessage("model", result.aiMessage);
         speakText(result.aiMessage);
       } catch (error) {
@@ -189,20 +184,10 @@ function ChatPageContent() {
     setProcessErrorCode("");
     setInvalidMessageKey("");
     setForceManualCard(true);
-    setShowPhotoBox(true);
     updateDraft({
       audioQuality: "text_input",
       isValidReport: true,
     });
-  }
-
-  // Langkah 5: Shortcut 0-token saat warga menekan tombol Lewati Foto
-  function handleSkipPhoto() {
-    setShowPhotoBox(false);
-    addMessage("user", t("chat.skipPhoto"));
-    const nextQuestion = t("chat.askLocation");
-    addMessage("model", nextQuestion);
-    speakText(nextQuestion);
   }
 
   // Langkah 6: Ambil koordinat GPS perangkat dan lakukan reverse geocoding
@@ -385,7 +370,7 @@ function ChatPageContent() {
   // Langkah 9: Tampilan sukses dengan Kode Tiket Pelacakan setelah laporan terkirim
   if (submittedTicket) {
     return (
-      <div className="flex min-h-[85vh] items-center justify-center bg-[#F5F5F5] px-4 py-8">
+      <div className="flex min-h-dvh items-center justify-center bg-[#F5F5F5] px-4 py-8">
         <div className="w-full max-w-lg rounded-2xl border-2 border-[#0A0A0A] bg-[#FFFFFF] p-6 text-center shadow-sm sm:p-8">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0A0A0A] text-[#FFFFFF]">
             <CheckCircle2 className="h-9 w-9" />
@@ -441,39 +426,39 @@ function ChatPageContent() {
     submitErrorCode === "PHOTO_TOO_LARGE" || submitErrorCode === "AUDIO_TOO_LARGE";
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col bg-[#F5F5F5]">
+    <div className="flex h-dvh flex-col bg-[#F5F5F5]">
       {/* Langkah 10: Header halaman chat dengan tombol kembali dan kontrol suara TTS */}
-      <header className="border-b border-[#D4D4D4] bg-[#0A0A0A] px-4 py-3 text-[#FFFFFF]">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
+      <header className="shrink-0 border-b border-[#D4D4D4] bg-[#0A0A0A] px-4 py-3 text-[#FFFFFF]">
+        {/* Tiga kolom: kiri dan kanan sama lebar agar judul tepat di tengah. Di HP hanya ikon */}
+        <div className="mx-auto grid max-w-3xl grid-cols-[1fr_auto_1fr] items-center gap-2">
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-base font-medium text-[#FFFFFF] hover:bg-[#171717]"
+            aria-label={t("common.back")}
+            className="inline-flex items-center gap-1.5 justify-self-start rounded-lg px-2.5 py-2 text-base font-medium text-[#FFFFFF] hover:bg-[#171717]"
           >
             <ArrowLeft className="h-5 w-5" />
-            <span>{t("common.back")}</span>
+            <span className="hidden sm:inline">{t("common.back")}</span>
           </button>
 
-          <h1 className="text-lg font-bold text-[#FFFFFF]">
+          <h1 className="truncate text-lg font-bold text-[#FFFFFF]">
             {t("chat.title")}
           </h1>
 
           <button
             type="button"
             onClick={toggleVoice}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#525252] bg-[#171717] px-3 py-1.5 text-sm font-semibold text-[#FFFFFF] hover:border-[#FFFFFF]"
+            aria-label={voiceEnabled ? t("chat.voiceOn") : t("chat.voiceOff")}
+            className="inline-flex items-center gap-1.5 justify-self-end rounded-lg border border-[#525252] bg-[#171717] px-3 py-2 text-base font-semibold text-[#FFFFFF] hover:border-[#FFFFFF]"
           >
             {voiceEnabled ? (
-              <>
-                <Volume2 className="h-4 w-4 text-[#DC2626]" />
-                <span>{t("chat.voiceOn")}</span>
-              </>
+              <Volume2 className="h-5 w-5 text-[#DC2626]" />
             ) : (
-              <>
-                <VolumeX className="h-4 w-4 text-[#D4D4D4]" />
-                <span>{t("chat.voiceOff")}</span>
-              </>
+              <VolumeX className="h-5 w-5 text-[#D4D4D4]" />
             )}
+            <span className="hidden sm:inline">
+              {voiceEnabled ? t("chat.voiceOn") : t("chat.voiceOff")}
+            </span>
           </button>
         </div>
       </header>
@@ -485,12 +470,9 @@ function ChatPageContent() {
         onSpeak={speakText}
       >
         {processErrorCode && (
-          <div className="rounded-xl border border-[#DC2626] bg-[#FEE2E2] p-4">
-            <div className="flex items-start gap-2 text-base font-medium text-[#0A0A0A]">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#DC2626]" />
-              <span>{t(`errors.${processErrorCode}`)}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+          <div className="sm:pl-12">
+            {/* Pesan gagalnya sudah tampil sebagai gelembung asisten; di sini cukup pilihan lanjutnya */}
+            <div className="flex flex-wrap gap-2">
               {processRetryCount < 2 && (
                 <button
                   type="button"
@@ -514,11 +496,9 @@ function ChatPageContent() {
         )}
 
         {invalidMessageKey && (
-          <div className="rounded-xl border border-[#DC2626] bg-[#FEE2E2] p-4">
-            <p className="text-base font-medium text-[#0A0A0A]">
-              {t(invalidMessageKey)}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+          <div className="sm:pl-12">
+            {/* Pesannya sudah tampil sebagai gelembung asisten; di sini cukup pilihan lanjutnya */}
+            <div className="flex flex-wrap gap-2">
               {/* Tombol rekam ulang hanya relevan jika laporan berasal dari rekaman */}
               {invalidMessageKey === "chat.invalidReport" && (
                 <button
@@ -545,7 +525,16 @@ function ChatPageContent() {
         {hasDraftReady && (
           <ReportPreviewCard
             draft={draft}
-            photoPreviewUrl={photoPreviewUrl}
+            photoSlot={
+              <PhotoUploadInput
+                photoPreviewUrl={photoPreviewUrl}
+                onAttachPhoto={attachPhoto}
+                onRemovePhoto={removePhoto}
+                disabled={isSubmitting}
+              />
+            }
+            onUseGps={handleUseCurrentGps}
+            isLocating={isLocating}
             onSaveEdit={(updated) => {
               updateDraft(updated);
               setForceManualCard(false);
@@ -557,16 +546,6 @@ function ChatPageContent() {
             }}
             onOpenLocationPicker={() => setIsLocationModalOpen(true)}
             forceEditMode={forceManualCard}
-            disabled={isSubmitting}
-          />
-        )}
-
-        {(showPhotoBox || photoPreviewUrl) && hasDraftReady && (
-          <PhotoUploadInput
-            photoPreviewUrl={photoPreviewUrl}
-            onAttachPhoto={attachPhoto}
-            onRemovePhoto={removePhoto}
-            onSkipPhoto={handleSkipPhoto}
             disabled={isSubmitting}
           />
         )}
@@ -603,59 +582,23 @@ function ChatPageContent() {
         )}
       </ChatWindow>
 
-      {/* Langkah 12: Bilah Quick Actions (0 token AI) dan form input pesan edit */}
-      <div className="border-t border-[#D4D4D4] bg-[#FFFFFF] px-4 py-3">
+      {/* Langkah 12: Bilah bawah. Baris 1: kirim laporan (0 token AI). Baris 2: kolom ketik pesan */}
+      <div className="shrink-0 border-t border-[#D4D4D4] bg-[#FFFFFF] px-4 py-3">
         <div className="mx-auto max-w-3xl space-y-2.5">
           {hasDraftReady && (
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowPhotoBox((prev) => !prev)}
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#0A0A0A] bg-[#FFFFFF] px-3 py-2 text-sm font-semibold text-[#0A0A0A] hover:bg-[#F5F5F5]"
-              >
-                <Camera className="h-4 w-4" />
-                <span>{t("chat.addPhoto")}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleUseCurrentGps}
-                disabled={isLocating || isSubmitting}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#0A0A0A] bg-[#FFFFFF] px-3 py-2 text-sm font-semibold text-[#0A0A0A] hover:bg-[#F5F5F5]"
-              >
-                {isLocating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Navigation className="h-4 w-4 text-[#DC2626]" />
-                )}
-                <span>{t("chat.useGps")}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsLocationModalOpen(true)}
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4D4D4] bg-[#F5F5F5] px-3 py-2 text-sm font-semibold text-[#0A0A0A] hover:bg-[#D4D4D4]/50"
-              >
-                <MapPin className="h-4 w-4" />
-                <span>{t("chat.pickOnMap")}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSubmitReport({ skipAttachments: false })}
-                disabled={isSubmitting || isProcessing}
-                className="ml-auto inline-flex items-center gap-2 rounded-lg bg-[#DC2626] px-4 py-2 text-base font-bold text-[#FFFFFF] hover:bg-[#B91C1C] disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Send className="h-5 w-5" />
-                )}
-                <span>{t("chat.submit")}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleSubmitReport({ skipAttachments: false })}
+              disabled={isSubmitting || isProcessing}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#DC2626] px-4 py-3 text-lg font-bold text-[#FFFFFF] hover:bg-[#B91C1C] disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+              <span>{t("chat.submit")}</span>
+            </button>
           )}
 
           <form onSubmit={handleSendMessage} className="flex items-center gap-2">
@@ -665,16 +608,18 @@ function ChatPageContent() {
               onChange={(e) => setInputText(e.target.value)}
               disabled={isProcessing || isSubmitting}
               placeholder={t("chat.inputPlaceholder")}
-              className="flex-1 rounded-xl border border-[#D4D4D4] bg-[#F5F5F5] px-4 py-3 text-base text-[#0A0A0A] placeholder-[#525252] focus:border-[#0A0A0A] focus:bg-[#FFFFFF] focus:outline-none"
+              aria-label={t("chat.inputPlaceholder")}
+              className="min-w-0 flex-1 rounded-xl border border-[#D4D4D4] bg-[#F5F5F5] px-4 py-3 text-base text-[#0A0A0A] placeholder-[#525252] focus:border-[#0A0A0A] focus:bg-[#FFFFFF] focus:outline-none"
             />
 
             <button
               type="submit"
               disabled={!inputText.trim() || isProcessing || isSubmitting}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#0A0A0A] px-5 py-3 text-base font-bold text-[#FFFFFF] hover:bg-[#171717] disabled:opacity-50"
+              aria-label={t("common.send")}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#0A0A0A] px-4 py-3 text-base font-bold text-[#FFFFFF] hover:bg-[#171717] disabled:opacity-50"
             >
               <Send className="h-5 w-5" />
-              <span>{t("common.send")}</span>
+              <span className="hidden sm:inline">{t("common.send")}</span>
             </button>
           </form>
         </div>

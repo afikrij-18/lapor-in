@@ -30,7 +30,7 @@ export async function mockProcessReport({ audioBlob, textInput }) {
       audioQuality: audioBlob ? "clear" : "text_input"
     },
     aiMessage:
-      "(Contoh) Saya sudah merangkum laporan Anda. Apakah Anda memiliki foto kondisi jalan tersebut? Jika ada silakan unggah, atau tekan Lewati."
+      "(Contoh) Saya sudah merangkum laporan Anda. Silakan tentukan lokasinya pada kartu di bawah. Foto boleh ditambahkan jika ada."
   };
 }
 

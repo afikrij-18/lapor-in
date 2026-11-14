@@ -42,7 +42,7 @@ export default function ChatBubble({ message, onSpeak }) {
         <p className="whitespace-pre-wrap break-words">{message.text}</p>
 
         <div
-          className={`mt-2 flex items-center gap-3 text-xs ${
+          className={`mt-2 flex items-center gap-3 text-sm ${
             isAi ? "justify-between text-[#D4D4D4]" : "justify-end text-[#525252]"
           }`}
         >
@@ -51,9 +51,9 @@ export default function ChatBubble({ message, onSpeak }) {
               type="button"
               onClick={() => onSpeak(message.text)}
               aria-label={t("chat.listen")}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-[#FFFFFF] hover:bg-[#0A0A0A] focus:outline-2 focus:outline-[#DC2626]"
+              className="-ml-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-[#FFFFFF] hover:bg-[#0A0A0A] focus:outline-2 focus:outline-[#DC2626]"
             >
-              <Volume2 className="h-3.5 w-3.5" />
+              <Volume2 className="h-4 w-4" />
               <span>{t("chat.listen")}</span>
             </button>
           )}

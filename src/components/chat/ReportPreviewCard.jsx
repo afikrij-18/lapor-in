@@ -4,8 +4,9 @@ import {
   Check,
   Edit3,
   FileText,
-  Image as ImageIcon,
+  Loader2,
   MapPin,
+  Navigation,
   X,
 } from "lucide-react";
 import {
@@ -18,9 +19,11 @@ import { useLanguage } from "../../hooks/useLanguage.js";
 
 export default function ReportPreviewCard({
   draft,
-  photoPreviewUrl,
+  photoSlot = null,
   onSaveEdit,
   onOpenLocationPicker,
+  onUseGps,
+  isLocating = false,
   forceEditMode = false,
   disabled = false,
 }) {
@@ -117,7 +120,7 @@ export default function ReportPreviewCard({
               type="button"
               onClick={handleStartEdit}
               disabled={disabled}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#0A0A0A] bg-[#FFFFFF] px-3 py-1.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#F5F5F5] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#0A0A0A] bg-[#FFFFFF] px-3 py-1.5 text-base font-semibold text-[#0A0A0A] hover:bg-[#F5F5F5] disabled:opacity-50"
             >
               <Edit3 className="h-4 w-4" />
               <span>{t("chat.editField")}</span>
@@ -243,40 +246,53 @@ export default function ReportPreviewCard({
             <dd className="text-[#0A0A0A]">{draft.summary || "-"}</dd>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-            <dt className="min-w-28 font-semibold text-[#525252]">
+          {/* Lokasi: alamat saat ini, lalu dua cara menentukannya (0 token AI) */}
+          <div className="flex flex-col gap-1.5 border-t border-[#D4D4D4] pt-3 sm:flex-row sm:gap-2">
+            <dt className="min-w-28 shrink-0 font-semibold text-[#525252]">
               {t("report.location")}:
             </dt>
-            <dd className="flex flex-wrap items-center gap-2 text-[#0A0A0A]">
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="h-4 w-4 shrink-0 text-[#DC2626]" />
-                <span>{draft.address || t("report.locationEmpty")}</span>
+            <dd className="flex min-w-0 flex-1 flex-col gap-2 text-[#0A0A0A]">
+              <span className="inline-flex items-start gap-1.5">
+                <MapPin className="mt-1 h-4 w-4 shrink-0 text-[#DC2626]" />
+                <span className="break-words">{draft.address || t("report.locationEmpty")}</span>
               </span>
-              {typeof onOpenLocationPicker === "function" && (
-                <button
-                  type="button"
-                  onClick={onOpenLocationPicker}
-                  disabled={disabled}
-                  className="text-sm font-semibold text-[#DC2626] underline hover:text-[#B91C1C]"
-                >
-                  {t("chat.pickOnMap")}
-                </button>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {typeof onUseGps === "function" && (
+                  <button
+                    type="button"
+                    onClick={onUseGps}
+                    disabled={disabled || isLocating}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#0A0A0A] bg-[#FFFFFF] px-3 py-2 text-base font-semibold text-[#0A0A0A] hover:bg-[#F5F5F5] disabled:opacity-50"
+                  >
+                    {isLocating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Navigation className="h-4 w-4 text-[#DC2626]" />
+                    )}
+                    <span>{t("chat.useGps")}</span>
+                  </button>
+                )}
+                {typeof onOpenLocationPicker === "function" && (
+                  <button
+                    type="button"
+                    onClick={onOpenLocationPicker}
+                    disabled={disabled}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#0A0A0A] bg-[#FFFFFF] px-3 py-2 text-base font-semibold text-[#0A0A0A] hover:bg-[#F5F5F5] disabled:opacity-50"
+                  >
+                    <MapPin className="h-4 w-4 text-[#DC2626]" />
+                    <span>{t("chat.pickOnMap")}</span>
+                  </button>
+                )}
+              </div>
             </dd>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-            <dt className="min-w-28 font-semibold text-[#525252]">
+          {/* Foto: tombol tambah, atau pratinjau dan tombol hapus (diisi halaman chat) */}
+          <div className="flex flex-col gap-1.5 border-t border-[#D4D4D4] pt-3 sm:flex-row sm:gap-2">
+            <dt className="min-w-28 shrink-0 font-semibold text-[#525252]">
               {t("report.photo")}:
             </dt>
-            <dd className="flex items-center gap-2 text-[#0A0A0A]">
-              <ImageIcon className="h-4 w-4 shrink-0 text-[#525252]" />
-              <span>
-                {photoPreviewUrl || draft.hasPhoto
-                  ? t("report.photoAttached")
-                  : t("report.photoEmpty")}
-              </span>
-            </dd>
+            <dd className="min-w-0 flex-1 text-[#0A0A0A]">{photoSlot}</dd>
           </div>
         </dl>
       )}

@@ -44,7 +44,7 @@
     "voiceOff": "Suara: Mati",
     "inputPlaceholder": "Ketik pesan atau perintah edit di sini...",
     "processing": "Sedang memproses laporan Anda...",
-    "askPhoto": "Apakah Anda memiliki foto kondisi di lokasi? Jika ada, silakan unggah. Jika tidak ada, tekan Lewati.",
+    "askPhoto": "Apakah Anda memiliki foto kondisi di lokasi? Jika ada, silakan tambahkan pada kartu laporan.",
     "askLocation": "Di mana lokasi kejadiannya?",
     "addPhoto": "Tambah Foto",
     "skipPhoto": "Lewati Foto",

@@ -39,7 +39,7 @@ export default function PhotoUploadInput({
   }
 
   return (
-    <div className="rounded-xl border border-[#D4D4D4] bg-[#FFFFFF] p-4">
+    <div className="w-full">
       <input
         ref={fileInputRef}
         type="file"
@@ -56,12 +56,12 @@ export default function PhotoUploadInput({
             <img
               src={photoPreviewUrl}
               alt={t("report.photo")}
-              className="max-h-56 w-full object-contain"
+              className="max-h-44 w-full object-contain"
             />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0A0A0A]">
+            <span className="inline-flex items-center gap-1.5 text-base font-medium text-[#0A0A0A]">
               <ImageIcon className="h-4 w-4 text-[#525252]" />
               {t("report.photoAttached")}
             </span>
@@ -84,7 +84,7 @@ export default function PhotoUploadInput({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled || isCompressing}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#0A0A0A] px-4 py-2.5 text-base font-medium text-[#FFFFFF] hover:bg-[#171717] disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#0A0A0A] bg-[#FFFFFF] px-3 py-2 text-base font-semibold text-[#0A0A0A] hover:bg-[#F5F5F5] disabled:opacity-50"
           >
             {isCompressing ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -111,7 +111,7 @@ export default function PhotoUploadInput({
 
       {/* Langkah 4: Tampilkan pesan error terlokalisasi apabila kompresi atau ukuran foto gagal */}
       {errorCode && (
-        <p className="mt-2 rounded-lg bg-[#FEE2E2] px-3 py-2 text-sm font-medium text-[#DC2626]">
+        <p className="mt-2 rounded-lg bg-[#FEE2E2] px-3 py-2 text-base font-medium text-[#B91C1C]">
           {t(`errors.${errorCode}`)}
         </p>
       )}

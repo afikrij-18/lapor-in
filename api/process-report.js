@@ -22,7 +22,7 @@ Aturan:
 4. Jangan menebak info yang tidak diucapkan.
 5. Jika hanya bising kosong/spam, set isValidReport: false dan audioQuality: "unusable".
 6. title maks 60 karakter, summary maks 1000 karakter.
-7. aiMessage: 1-2 kalimat ramah merangkum laporan dan menanyakan apakah ada foto lokasi (atau tekan Lewati).`;
+7. aiMessage: 1-2 kalimat ramah merangkum laporan, lalu minta warga menentukan lokasi pada kartu laporan (foto boleh ditambahkan jika ada).`;
 
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -255,7 +255,7 @@ export default async function handler(req, res) {
       draft: cleanDraft,
       aiMessage:
         parsedResult.aiMessage ||
-        "Saya sudah merangkum laporan Anda. Apakah Anda memiliki foto kondisi di lokasi? Jika ada silakan unggah, atau tekan Lewati.",
+        "Saya sudah merangkum laporan Anda. Silakan tentukan lokasinya pada kartu di bawah. Foto boleh ditambahkan jika ada.",
     });
   } catch (error) {
     const errorMessage = String(error?.message || "");
