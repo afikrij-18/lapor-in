@@ -11,6 +11,8 @@
 > Revisi 14 Nov 2026: rekaman dibatasi 120 detik dan alasan bitrate 24 kbps diluruskan (3, 4.1, 4.2); rekaman audio disimpan khusus admin selama 30 hari, dengan pemberitahuan di homepage dan tombol putar di dashboard admin (3, 5.1, 6.1, 6.4, 8.3); koleksi baru `report_private` untuk `rawTranscript`, `reporterUid`, `adminNotes`, dan `audioPath` (8.1, 8.3); metadata foto dibuang dan folder Storage dipisah per pengguna (7.1, 8.3); alur gagal dan format error seragam ditambahkan (3, 8.2); model menjadi Gemini 2.5 Flash tier gratis dengan SDK `@google/genai` dan API key terpisah untuk development dan demo (4, 7.2, 7.4, 8.2); `vite`, `@vitejs/plugin-react`, dan `@tailwindcss/vite` masuk daftar library (7.2); kontrak fungsi service ditambahkan (7.5); urutan antrean admin ditetapkan (5.1, 7.3). Versi library di 7.2 disamakan dengan yang terpasang di repository (React 19, `react-router-dom` 7, `react-leaflet` 5, `firebase` 13, `firebase-admin` 14, `lucide-react` 1.72, `@marsidev/react-turnstile` 1.6, `leaflet.markercluster` 1.5.3), ESLint masuk daftar library, dan `.eslintrc.cjs` diganti `eslint.config.js` (7.1, 9.2).
 >
 > Revisi saat hackathon dimulai (14 Nov 2026): Firebase Storage tidak dipakai karena membutuhkan paket Blaze. Foto dan rekaman disimpan di Firestore sebagai `Bytes` pada koleksi baru `report_photos` dan `report_audio`; `photoUrl` menjadi `hasPhoto`, `audioPath` menjadi `hasAudio`, foto hasil kompresi dibatasi 500 KB, `storage.rules` dan `VITE_FIREBASE_STORAGE_BUCKET` dihapus, dan `getReportPhotoUrl` ditambahkan ke kontrak service (3, 7.1, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3). Nama branch kerja menjadi nama anggota (9.1). Rincian: `USULAN-FIRESTORE.md`.
+>
+> Revisi kedua saat hackathon: rekaman dikirim ke `/api/process-report` sebagai base64 di dalam JSON, bukan `multipart/form-data` (8.2); batas keluaran menjadi 1024 untuk `process-report` dan 350 untuk `chat-assistant`, keduanya dengan `thinkingBudget: 0` (4.2); mode mock `VITE_USE_MOCK_API` ditambahkan (7.1, 7.4, 7.5); serah terima halaman utama ke halaman chat lewat `useReportDraft()`, dan widget Turnstile dipindah ke halaman chat (3, 7.5). File aturan agent bernama `AGENTS.md`.
 
 ---
 
@@ -68,7 +70,7 @@ Antarmuka Lapor.in menggunakan skema kontras tinggi **Hitam, Merah, Putih** untu
 
 ### Langkah 1: Halaman Utama (Homepage - `/`)
 
-1. Pengguna membuka aplikasi Lapor.in. Sistem secara otomatis melakukan **Firebase Silent Anonymous Auth** di latar belakang dan memuat widget **Cloudflare Turnstile** secara transparan (tanpa tantangan klik gambar).
+1. Pengguna membuka aplikasi Lapor.in. Sistem secara otomatis melakukan **Firebase Silent Anonymous Auth** di latar belakang. Widget **Cloudflare Turnstile** tidak dimuat di halaman ini, melainkan di halaman `/chat`, tempat `/api/process-report` dipanggil: token Turnstile hanya berlaku sekali, sehingga tombol "Coba Lagi" membutuhkan token baru dari widget di halaman yang sama.
 2. Di tengah layar terdapat **Tombol Mikrofon Besar** berwarna Merah (`#DC2626`) bertuliskan *"Tekan & Ceritakan Masalah Anda"*.
 3. Tepat di bawah tombol mikrofon terdapat **Tombol Sekunder Input Manual** berwarna Putih berbingkai Hitam (`#0A0A0A`) bertuliskan *"Ketik Laporan Secara Manual"*.
 4. Pengguna memilih salah satu cara:
@@ -138,7 +140,10 @@ Agar kuota gratis Gemini API tidak boros dan latensi tetap cepat di bawah 3 deti
 2. **State-Driven Context Injection:** State formulir laporan saat ini (`title`, `category`, `urgency`, `summary`, `address`, `hasPhoto`) diringkas menjadi objek JSON ringkas (< 120 token) di setiap request daripada mengulang percakapan panjang.
 3. **Rule-Based Shortcut Tanpa AI untuk Aksi Tombol:** Jika pengguna menekan tombol cepat (`"Lewati Foto"`, `"Gunakan GPS"`, `"Kirim Laporan"`), frontend memperbarui state secara lokal di React tanpa memanggil Gemini API sama sekali (hemat 100% token pada langkah navigasi).
 4. **Batas Durasi Rekaman 120 Detik & Audio Low-Bitrate (24 kbps Mono):** Gemini menghitung token audio berdasarkan durasi, bukan bitrate, sehingga penghematan token berasal dari batas durasi 120 detik. Bitrate 24 kbps mono dipakai agar unggahan cepat pada kondisi internet lapangan yang tidak menentu.
-5. **Output JSON Schema Terkunci (responseSchema) & Batas maxOutputTokens: 350:** Mencegah AI menghasilkan paragraf basa-basi yang panjang.
+5. **Output JSON Schema Terkunci (responseSchema) & Batas maxOutputTokens per Endpoint:** Mencegah AI menghasilkan paragraf basa-basi yang panjang.
+   - `/api/process-report`: `maxOutputTokens: 1024`, karena balasannya memuat ringkasan (maksimal 1000 karakter) dan transkrip rekaman 120 detik.
+   - `/api/chat-assistant`: `maxOutputTokens: 350`, karena balasannya pendek.
+   - Kedua endpoint memakai `thinkingConfig: { thinkingBudget: 0 }`. Pada Gemini 2.5 Flash, token "thinking" ikut memakan jatah keluaran; tanpa pengaturan ini balasan JSON bisa terpotong. Ketelitian klasifikasi dijaga dengan aturan urgensi dan validitas yang tertulis jelas di system prompt.
 6. **System Instruction Ringkas & Terisolasi:** System prompt ditulis padat di bawah 250 token dengan pemisah teks input pengguna untuk mencegah prompt injection sekaligus menghemat token input.
 7. **Geocoding & Clustering Tanpa AI:** Konversi koordinat ke alamat menggunakan Nominatim OSM + Geohash Cache di Firestore tanpa melibatkan Gemini.
 
@@ -318,7 +323,7 @@ lapor.in/
 │   │   └── constants.js                # Enum kategori, urgensi, status, palet warna
 │   ├── context/
 │   │   ├── LanguageContext.jsx         # State global bahasa (ID; EN opsional)
-│   │   └── ReportDraftContext.jsx      # State global draf laporan aktif di halaman chat
+│   │   └── ReportDraftContext.jsx      # State global draf laporan aktif (halaman utama & chat)
 │   ├── hooks/
 │   │   ├── useAudioRecorder.js         # Logika perekaman suara, noise suppression, bitrate
 │   │   ├── useSpeechSynthesis.js       # Logika Text-to-Speech (TTS) browser
@@ -331,6 +336,7 @@ lapor.in/
 │   │   └── AdminDashboardPage.jsx      # Route: /admin
 │   ├── services/
 │   │   ├── apiClient.js                # Wrapper fetch ke /api/*
+│   │   ├── apiMocks.js                 # Balasan contoh /api/* untuk mode mock (development)
 │   │   ├── reportService.js            # Operasi CRUD Firestore, termasuk foto & rekaman (Bytes)
 │   │   └── authService.js              # Silent Anonymous Auth & Admin Email/Password Auth
 │   ├── utils/
@@ -434,6 +440,7 @@ export const INITIAL_REPORT_DRAFT = {
   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
   - `VITE_FIREBASE_APP_ID`
   - `VITE_TURNSTILE_SITE_KEY`
+  - `VITE_USE_MOCK_API` (`"true"` atau `"false"`; mode mock, lihat bagian 7.5. Hanya berlaku saat `npm run dev`)
 - **Backend Serverless (Rahasia Server):**
   - `GEMINI_API_KEY` (dua key terpisah dengan nama variabel yang sama: key development untuk `.env.local` dan environment Preview/Development di Vercel, key demo hanya untuk environment Production, agar kuota demo tidak terpakai saat pengembangan)
   - `TURNSTILE_SECRET_KEY`
@@ -480,6 +487,26 @@ URL sementara dari `getReportPhotoUrl` dan `getReportAudioUrl` dibuat dengan `UR
 | `processReport({ audioBlob, textInput, turnstileToken })` | salah satu dari `audioBlob` atau `textInput` wajib ada | `{ draft, aiMessage }` | `POST /api/process-report` |
 | `sendChatMessage({ userMessage, currentDraft, recentHistory })` | sesuai Request JSON Endpoint 2 | `{ updatedFields, aiMessage }` | `POST /api/chat-assistant` |
 | `reverseGeocode(latitude, longitude)` | number, number | `{ address, geohash, source }` | `GET /api/reverse-geocode` |
+
+**Mode mock.** Jika `.env.local` berisi `VITE_USE_MOCK_API=true` dan aplikasi dijalankan dengan `npm run dev`, ketiga fungsi di atas membalas data contoh dari `src/services/apiMocks.js` tanpa memanggil `/api/*`. Tujuannya dua: tampilan bisa dikerjakan sebelum endpoint jadi, dan kuota Gemini tidak terpakai saat pengembangan. Bentuk balasannya sama dengan bagian 8.2. Mode ini tidak pernah aktif di build produksi. Untuk menguji endpoint sungguhan, isi `VITE_USE_MOCK_API=false`.
+
+#### `useReportDraft()` (`src/hooks/useReportDraft.js` dan `src/context/ReportDraftContext.jsx`)
+
+Draf laporan dibagi antara halaman utama (memulai) dan halaman chat (mengisi). Draf, termasuk rekaman suara, hanya hidup di memori browser.
+
+| Nama | Bentuk | Dipakai Oleh | Keterangan |
+|---|---|---|---|
+| `draft` | objek `INITIAL_REPORT_DRAFT` | Halaman chat | Isi laporan yang sedang dibuat. Rekaman ada di `draft.audioBlob`. |
+| `inputMode` | `"audio"`, `"manual"`, atau `null` | Halaman chat | `null` berarti belum ada draf. |
+| `startDraft({ inputMode, audioBlob })` | `audioBlob`: `Blob`, hanya untuk `"audio"` | Halaman utama | Memulai draf baru, lalu halaman utama pindah ke `/chat`. |
+| `updateDraft(fields)` | `fields`: sebagian isi draf | Halaman chat | Menggabungkan `fields` ke draf, misalnya hasil AI atau koreksi warga. |
+| `resetDraft()` | tidak ada | Halaman chat | Mengosongkan draf setelah laporan terkirim. |
+
+Aturan serah terima:
+
+- Halaman utama **tidak** mengirim data lewat state navigasi; ia memanggil `startDraft(...)` lalu `navigate("/chat")`.
+- Jika `/chat` dibuka saat `inputMode` bernilai `null` (misalnya setelah halaman dimuat ulang), warga dikembalikan ke halaman utama.
+- Token Turnstile tidak ikut diserahterimakan. `TurnstileWidget` dipasang di halaman chat, dan tokennya diteruskan ke `processReport`.
 
 ---
 
@@ -598,14 +625,16 @@ Setiap endpoint yang gagal membalas dengan status HTTP `4xx` atau `5xx` dan satu
 #### Endpoint 1: `POST /api/process-report`
 
 - **Fungsi:** Memproses input pertama warga (file audio rekaman atau teks manual) menjadi draf laporan terstruktur menggunakan Gemini 2.5 Flash.
-- **Headers:** `Content-Type: multipart/form-data` (untuk audio) atau `application/json` (untuk teks), `x-turnstile-token: <token>`.
-- **Request Payload:**
-  - `audioFile` (Blob/File, maksimal 120 detik, opsional jika `textInput` ada). Endpoint ini tidak menyimpan audio; penyimpanan dilakukan frontend saat laporan dikirim.
-  - `textInput` (String, opsional jika `audioFile` ada)
+- **Headers:** `Content-Type: application/json` (untuk audio maupun teks), `x-turnstile-token: <token>`.
+- **Request Payload (JSON):**
+  - `audioBase64` (String, opsional jika `textInput` ada): isi rekaman dalam base64, tanpa awalan `data:`. Rekaman maksimal 120 detik (sekitar 360 KB, menjadi sekitar 480 KB setelah base64). `multipart/form-data` tidak dipakai karena membutuhkan package pengurai di server.
+  - `audioMimeType` (String, wajib jika `audioBase64` ada): misalnya `"audio/webm;codecs=opus"` atau `"audio/mp4"`.
+  - `textInput` (String, opsional jika `audioBase64` ada)
+  - Endpoint ini tidak menyimpan audio; penyimpanan dilakukan frontend saat laporan dikirim.
   - `language` (`"id"`; `"en"` menyusul apabila bahasa Inggris dikerjakan)
 - **Proses Backend:**
   1. Verifikasi token Cloudflare Turnstile ke `https://challenges.cloudflare.com/turnstile/v0/siteverify`.
-  2. Kirim audio/teks ke Gemini 2.5 Flash dengan `responseSchema` terkunci dan instruksi normalisasi dialek & gangguan bicara.
+  2. Kirim audio/teks ke Gemini 2.5 Flash dengan `responseSchema` terkunci, `maxOutputTokens: 1024`, `thinkingBudget: 0`, dan instruksi normalisasi dialek & gangguan bicara. Audio diteruskan ke Gemini sebagai data inline (base64 dan MIME type dari payload).
 - **Response JSON (`200 OK`):**
 
 ```json

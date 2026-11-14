@@ -96,6 +96,17 @@ Firebase Storage ternyata membutuhkan paket Blaze, sehingga tidak dipakai. Rinci
 | Kontrak service | Tidak ada | Fungsi `getReportPhotoUrl(reportId)` ditambahkan; `getReportAudioUrl` menerima `reportId` | 7.5 |
 | Nama branch | `feat/anggota-N-...` | Nama anggota: `fikri`, `irfan`, `nugi`, `zikri`, `taqi` | 9.1 |
 
+## 5b. Endpoint Gemini dan Serah Terima ke Halaman Chat (Revisi Kedua Saat Hackathon)
+
+| Hal | PRD Awal | PRD Terakhir | Bagian |
+|---|---|---|---|
+| Pengiriman rekaman ke `process-report` | `multipart/form-data` dengan `audioFile` | JSON dengan `audioBase64` dan `audioMimeType` (tanpa package pengurai di server) | 8.2 |
+| Batas keluaran Gemini | `maxOutputTokens: 350` untuk semua | 1024 untuk `process-report`, 350 untuk `chat-assistant`; keduanya `thinkingBudget: 0` | 4.2 |
+| Mode mock | Tidak ada | `VITE_USE_MOCK_API=true`: `apiClient.js` membalas data contoh saat development | 7.1, 7.4, 7.5 |
+| Serah terima halaman utama ke chat | Tidak diatur | Lewat `useReportDraft()`: `startDraft`, `updateDraft`, `resetDraft` | 7.5 |
+| Letak widget Turnstile | Halaman utama | Halaman chat, tempat `process-report` dipanggil | 3 |
+| Nama file aturan agent | Tidak ada | `AGENTS.md` | - |
+
 ## 6. Kontrak Data
 
 | Hal | PRD Awal | PRD Terakhir | Bagian |
@@ -136,7 +147,6 @@ Tiga hal ini tidak ada di PRD awal.
 
 Hal berikut sudah dibahas tetapi belum diputuskan, sehingga belum masuk `PRD.md`.
 
-- **`maxOutputTokens: 350` (strategi 5, bagian 4.2):** angka ini berasal dari PRD awal. Dengan Gemini 2.5 Flash dan ringkasan 1000 karakter, balasan JSON `process-report` bisa terpotong. Usul: matikan thinking (`thinkingBudget: 0`) dan naikkan batas ke sekitar 1024.
 - **Penghematan request Gemini:** mode mock saat development, satu request per laporan, edit tanpa AI, tanpa retry otomatis, penyaringan input di browser, dan model cadangan.
 - **Bahasa Minang:** aturan di system prompt (bahasa `rawTranscript`, nama tempat tidak diterjemahkan, larangan menebak kata, glosarium istilah lokal).
 - **Pembagian tugas:** pemilik endpoint Gemini, `LocationPickerModal.jsx`, dan `ticketGenerator.js`, serta pekerjaan baru yang muncul dari revisi ini (`report_private`, Security Rules baru, pemutar rekaman di dashboard admin).

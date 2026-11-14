@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Footer from "./components/common/Footer.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
+import { ReportDraftProvider } from "./context/ReportDraftContext.jsx";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
 import AdminLoginPage from "./pages/AdminLoginPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
@@ -22,6 +23,8 @@ function App() {
 
   return (
     <LanguageProvider>
+      {/* Draf laporan dibagi antara halaman utama (memulai) dan halaman chat (mengisi) */}
+      <ReportDraftProvider>
       <BrowserRouter>
         <div className="flex min-h-screen flex-col">
           <div className="flex-1">
@@ -38,6 +41,7 @@ function App() {
           <Footer />
         </div>
       </BrowserRouter>
+      </ReportDraftProvider>
     </LanguageProvider>
   );
 }

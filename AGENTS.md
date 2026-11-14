@@ -67,7 +67,9 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
    - Seluruh akses data dan API **WAJIB** melewati fungsi kontrak pada `src/services/`:
      - `src/services/reportService.js`: `createReport`, `listPublicReports`, `listReportsForAdmin`, `getReportPrivate`, `getReportPhotoUrl`, `getReportAudioUrl`, `updateReport`, `updateReportStatus`, `deleteReport`.
      - `src/services/authService.js`: `signInAnonymouslySilent`, `signInAdmin`, `signOutAdmin`, `onAuthChange`, `isAdminUser`.
-     - `src/services/apiClient.js`: `processReport`, `sendChatMessage`, `reverseGeocode`.
+     - `src/services/apiClient.js`: `processReport`, `sendChatMessage`, `reverseGeocode`. Dengan `VITE_USE_MOCK_API=true` di `.env.local` dan `npm run dev`, ketiganya membalas data contoh dari `src/services/apiMocks.js` tanpa memanggil `/api/*` (mode mock; tidak pernah aktif di build produksi).
+   - Draf laporan dibaca dan diubah **hanya** lewat `useReportDraft()` (`src/hooks/useReportDraft.js`): `draft`, `inputMode`, `startDraft({ inputMode, audioBlob })`, `updateDraft(fields)`, `resetDraft()`. Halaman utama memanggil `startDraft(...)` lalu `navigate("/chat")`. **DILARANG** mengirim rekaman atau data laporan lewat state navigasi (`navigate(path, { state })`). Jika `/chat` dibuka saat `inputMode` bernilai `null`, warga dikembalikan ke halaman utama.
+   - Teks antarmuka diambil lewat `useLanguage()` dari `src/hooks/useLanguage.js`.
    - Nama fungsi, urutan parameter, dan bentuk nilai kembalian service tidak boleh diubah tanpa persetujuan Project Lead.
 2. **Kepatuhan Konstanta & Enum Global (`src/config/constants.js`)**:
    - **DILARANG** mengubah nama key maupun nilai string pada `REPORT_CATEGORIES`, `URGENCY_LEVELS`, `URGENCY_SORT_ORDER`, `MAX_RECORDING_SECONDS` (`120`), `AUDIO_RETENTION_DAYS` (`30`), `REPORT_STATUS`, dan `INITIAL_REPORT_DRAFT`.
@@ -83,7 +85,8 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
 1. **Autentikasi & Otorisasi**:
    - Warga pelapor menggunakan **Firebase Silent Anonymous Auth** (`signInAnonymouslySilent()`) di latar belakang tanpa form pendaftaran.
    - Hanya terdapat **1 akun Admin tunggal** (`admin@laporin.id`) dengan Custom Claim `admin: true`. Tidak ada fitur registrasi publik.
-   - Endpoint `POST /api/process-report` wajib memverifikasi token **Cloudflare Turnstile** ke `https://challenges.cloudflare.com/turnstile/v0/siteverify`.
+   - Endpoint `POST /api/process-report` wajib memverifikasi token **Cloudflare Turnstile** ke `https://challenges.cloudflare.com/turnstile/v0/siteverify`. Komponen `TurnstileWidget` dipasang di halaman `/chat` (bukan halaman utama), dan tokennya diteruskan ke `processReport({ ..., turnstileToken })`. Token hanya berlaku sekali, jadi tombol "Coba Lagi" memakai token baru dari widget.
+   - Rekaman dikirim ke `POST /api/process-report` sebagai **JSON** berisi `audioBase64` dan `audioMimeType`. **DILARANG** memakai `multipart/form-data` (membutuhkan package pengurai di server).
    - Endpoint cron `GET /api/cleanup-audio` wajib memvalidasi header `Authorization: Bearer <CRON_SECRET>` dan selesai di bawah batas timeout Vercel Free Tier (`< 10 detik`).
 2. **Isolasi Data Publik vs Data Privat (`reports` vs `report_private`)**:
    - Koleksi `reports` dapat dibaca publik setelah status menjadi `verified`, `in_progress`, atau `resolved`. Dokumen `reports` **DILARANG KERAS** menyimpan `reporterUid`, `rawTranscript`, `adminNotes`, atau `hasAudio`. Dokumen `reports` memakai `hasPhoto` (boolean), bukan `photoUrl`.
@@ -106,7 +109,7 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
    - **State-Driven Context Injection**: Kirim ringkasan state draf laporan dalam JSON padat (`< 120 token`) di setiap request, bukan riwayat panjang.
    - **Rule-Based Shortcut (0 Token)**: Klik tombol cepat di UI (`"Lewati Foto"`, `"Gunakan GPS"`, `"Edit Field"` inline, `"Kirim Laporan"`) wajib memperbarui state lokal React tanpa memanggil API Gemini.
    - **Batas Durasi Audio 120 Detik**: Batasi durasi rekaman agar konsumsi token audio tetap terkendali.
-   - **Locked JSON Schema**: Wajib gunakan `responseSchema` terkunci dan batas `maxOutputTokens: 350`.
+   - **Locked JSON Schema**: Wajib gunakan `responseSchema` terkunci. Batas keluaran: `maxOutputTokens: 1024` untuk `/api/process-report` dan `maxOutputTokens: 350` untuk `/api/chat-assistant`. Kedua endpoint wajib memakai `thinkingConfig: { thinkingBudget: 0 }`, karena token "thinking" Gemini 2.5 Flash ikut memakan jatah keluaran dan dapat memotong JSON.
    - **System Instruction Padat (`< 250 token`)**: Pisahkan teks input pengguna secara eksplisit di dalam prompt untuk mencegah *prompt injection*.
    - **Geocoding Tanpa AI**: Reverse geocoding menggunakan `/api/reverse-geocode` yang mengecek cache Firestore `geocode_cache/{geohash}` (presisi 7, berlaku 30 hari) dan mengantrekan request ke OSM Nominatim dengan jeda minimal `1100 ms`.
 3. **Penanganan Alur Gagal (Zero Dead-End Policy)**:

@@ -2,9 +2,14 @@
 // Balasan gagal diubah menjadi Error dengan properti code (format error: PRD bagian 8.2).
 
 import { CLIENT_ERROR_CODES, createAppError } from "../utils/appError.js";
+import { mockProcessReport, mockReverseGeocode, mockSendChatMessage } from "./apiMocks.js";
 
 // Bahasa antarmuka saat ini. "en" menyusul apabila bahasa Inggris dikerjakan.
 const LANGUAGE = "id";
+
+// Mode mock: balasan contoh tanpa memanggil /api/*. Hanya bisa aktif saat development
+// (npm run dev) dengan VITE_USE_MOCK_API=true di .env.local. Di build produksi selalu mati.
+const USE_MOCK_API = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_API === "true";
 
 // Mengirim request lalu mengembalikan isi JSON, atau melempar Error dengan code.
 async function request(path, options) {
@@ -37,15 +42,17 @@ async function request(path, options) {
   return body;
 }
 
-// Menentukan nama file rekaman dari tipe MIME-nya, misalnya "audio/webm;codecs=opus".
-function getAudioFileName(audioBlob) {
-  if (audioBlob.type.includes("mp4")) {
-    return "recording.mp4";
-  }
-  if (audioBlob.type.includes("ogg")) {
-    return "recording.ogg";
-  }
-  return "recording.webm";
+// Mengubah Blob rekaman menjadi teks base64 (tanpa awalan "data:...;base64,").
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      resolve(dataUrl.slice(dataUrl.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 // Memproses input pertama warga menjadi draf laporan (POST /api/process-report).
@@ -56,29 +63,46 @@ export async function processReport({ audioBlob, textInput, turnstileToken }) {
     throw createAppError(CLIENT_ERROR_CODES.INVALID_INPUT);
   }
 
-  const headers = { "x-turnstile-token": turnstileToken || "" };
-  let body;
+  if (USE_MOCK_API) {
+    return mockProcessReport({ audioBlob, textInput });
+  }
 
+  // Langkah 2: Susun isi request. Rekaman dikirim sebagai base64 di dalam JSON
+  let payload;
   if (audioBlob) {
-    // Langkah 2a: Rekaman dikirim sebagai multipart/form-data.
-    // Content-Type tidak diisi manual; browser yang menambahkan boundary-nya
-    body = new FormData();
-    body.append("audioFile", audioBlob, getAudioFileName(audioBlob));
-    body.append("language", LANGUAGE);
+    try {
+      payload = {
+        audioBase64: await blobToBase64(audioBlob),
+        audioMimeType: audioBlob.type,
+        language: LANGUAGE
+      };
+    } catch (error) {
+      console.error("Error pada processReport (membaca rekaman):", error);
+      throw createAppError(CLIENT_ERROR_CODES.INVALID_INPUT, error);
+    }
   } else {
-    // Langkah 2b: Teks dikirim sebagai JSON
-    headers["Content-Type"] = "application/json";
-    body = JSON.stringify({ textInput, language: LANGUAGE });
+    payload = { textInput, language: LANGUAGE };
   }
 
   // Langkah 3: Kirim dan kembalikan bagian yang dipakai halaman chat
-  const result = await request("/api/process-report", { method: "POST", headers, body });
+  const result = await request("/api/process-report", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-turnstile-token": turnstileToken || ""
+    },
+    body: JSON.stringify(payload)
+  });
   return { draft: result.draft, aiMessage: result.aiMessage };
 }
 
 // Mengirim pesan warga ke asisten AI (POST /api/chat-assistant).
 // Mengembalikan { updatedFields, aiMessage }.
 export async function sendChatMessage({ userMessage, currentDraft, recentHistory }) {
+  if (USE_MOCK_API) {
+    return mockSendChatMessage({ userMessage, currentDraft, recentHistory });
+  }
+
   const result = await request("/api/chat-assistant", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -95,6 +119,10 @@ export async function sendChatMessage({ userMessage, currentDraft, recentHistory
 // Mengubah koordinat menjadi alamat (GET /api/reverse-geocode).
 // Mengembalikan { address, geohash, source }.
 export async function reverseGeocode(latitude, longitude) {
+  if (USE_MOCK_API) {
+    return mockReverseGeocode(latitude, longitude);
+  }
+
   const params = new URLSearchParams({ lat: String(latitude), lng: String(longitude) });
   const result = await request(`/api/reverse-geocode?${params.toString()}`, { method: "GET" });
   return { address: result.address, geohash: result.geohash, source: result.source };

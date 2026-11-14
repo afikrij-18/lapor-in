@@ -1,27 +1,22 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/common/Navbar';
-import TurnstileWidget from '../components/common/TurnstileWidget';
 import MicHeroButton from '../components/home/MicHeroButton';
 import ManualInputBtn from '../components/home/ManualInputBtn';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useLanguage } from '../hooks/useLanguage.js';
+import { useReportDraft } from '../hooks/useReportDraft.js';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const [turnstileToken, setTurnstileToken] = useState('');
+  const { startDraft } = useReportDraft();
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Pindah ke halaman chat membawa rekaman suara
+  // Simpan rekaman ke draf laporan, lalu pindah ke halaman chat
   const goToChatWithAudio = (blob) => {
-    navigate('/chat', {
-      state: {
-        mode: 'audio',
-        audioBlob: blob,
-        turnstileToken,
-      },
-    });
+    startDraft({ inputMode: 'audio', audioBlob: blob });
+    navigate('/chat');
   };
 
   // Jika rekaman berhenti otomatis di batas 120 detik, rekaman tetap diproses
@@ -49,7 +44,9 @@ export default function HomePage() {
   };
 
   const handleManualClick = () => {
-    navigate('/chat', { state: { mode: 'manual', turnstileToken } });
+    // Mulai draf kosong untuk jalur ketik manual, lalu pindah ke halaman chat
+    startDraft({ inputMode: 'manual' });
+    navigate('/chat');
   };
 
   return (
@@ -85,8 +82,6 @@ export default function HomePage() {
         </div>
 
         <p className="mt-10 text-base text-[#D4D4D4]">{t('home.retentionNotice')}</p>
-
-        <TurnstileWidget onSuccess={(token) => setTurnstileToken(token)} />
       </main>
     </div>
   );
