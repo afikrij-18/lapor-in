@@ -1,9 +1,10 @@
 // State global bahasa antarmuka (saat ini Bahasa Indonesia saja).
 // Seluruh teks antarmuka diambil dari public/locales/id.json, tidak ditulis langsung di komponen.
-// Cara memakai teks di komponen: lihat src/hooks/useLanguage.js.
+// Dilengkapi fallback kamus default instan dan cache-busting agar kunci mentah tidak pernah muncul.
 
 import { useEffect, useMemo, useState } from "react";
 import { LanguageContext } from "../hooks/useLanguage.js";
+import defaultDictionary from "../../public/locales/id.json";
 
 const LANGUAGE = "id";
 
@@ -25,26 +26,24 @@ function fillParams(text, params) {
 }
 
 export function LanguageProvider({ children }) {
-  const [dictionary, setDictionary] = useState(null);
+  // Inisialisasi awal langsung dengan kamus lokal agar aplikasi tidak menunggu fetch dan bebas kedipan kunci mentah
+  const [dictionary, setDictionary] = useState(defaultDictionary);
 
   useEffect(() => {
     let isActive = true;
 
-    // Langkah 1: Muat kamus teks dari folder public
-    fetch(`/locales/${LANGUAGE}.json`)
+    // Langkah 1: Muat kamus teks terbaru dari server/folder public dengan pencegah cache
+    fetch(`/locales/${LANGUAGE}.json?v=${Date.now()}`, { cache: "no-store" })
       .then((response) => response.json())
       .then((loadedDictionary) => {
-        // Langkah 2: Simpan kamus jika komponen masih terpasang
-        if (isActive) {
+        // Langkah 2: Perbarui kamus jika berhasil dimuat dan komponen masih terpasang
+        if (isActive && loadedDictionary && typeof loadedDictionary === "object") {
           setDictionary(loadedDictionary);
         }
       })
       .catch((error) => {
-        // Langkah 3: Jika gagal, aplikasi tetap jalan dan menampilkan kunci teksnya
-        console.error("Error pada LanguageProvider (memuat kamus teks):", error);
-        if (isActive) {
-          setDictionary({});
-        }
+        // Langkah 3: Jika gagal, aplikasi tetap menggunakan defaultDictionary
+        console.warn("Gagal memperbarui kamus teks via jaringan, menggunakan fallback default:", error);
       });
 
     return () => {
@@ -53,18 +52,19 @@ export function LanguageProvider({ children }) {
   }, []);
 
   const value = useMemo(() => {
-    // Fungsi penerjemah: mengembalikan teks, atau kuncinya jika teks tidak ditemukan
-    const t = (key, params) => {
+    // Fungsi penerjemah: mengembalikan teks, atau fallback cadangan, atau kuncinya jika keduanya tidak ada
+    const t = (key, params, fallback) => {
       const text = findText(dictionary, key);
-      return typeof text === "string" ? fillParams(text, params) : key;
+      if (typeof text === "string") {
+        return fillParams(text, params);
+      }
+      if (typeof fallback === "string") {
+        return fillParams(fallback, params);
+      }
+      return key;
     };
     return { language: LANGUAGE, t };
   }, [dictionary]);
-
-  // Tunggu kamus selesai dimuat agar halaman tidak sempat menampilkan kunci mentah
-  if (dictionary === null) {
-    return null;
-  }
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
