@@ -136,7 +136,11 @@ export default async function handler(req, res) {
     // Langkah 5: Panggil API Nominatim OSM dengan throttling minimal 1100 ms
     await throttleOsmRequest();
 
-    const contactEmail = process.env.OSM_CONTACT_EMAIL || "contact@laporin.id";
+    // Nominatim mewajibkan identitas dengan kontak sungguhan; tanpa itu request tidak dikirim
+    const contactEmail = process.env.OSM_CONTACT_EMAIL;
+    if (!contactEmail) {
+      throw new Error("OSM_CONTACT_EMAIL belum diisi di environment variable");
+    }
     const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
 
     const osmResponse = await fetch(nominatimUrl, {
@@ -152,6 +156,13 @@ export default async function handler(req, res) {
     }
 
     const osmData = await osmResponse.json();
+
+    // Titik yang tidak dikenali Nominatim (misalnya di laut) tidak punya rincian alamat.
+    // Hasil seperti itu tidak disimpan ke cache; warga diminta mengetik alamatnya sendiri.
+    if (!osmData || osmData.error || !osmData.address) {
+      throw new Error(`Nominatim tidak mengenali titik ${latitude}, ${longitude}`);
+    }
+
     const formattedAddress = formatPrivacySafeAddress(osmData.address, osmData.display_name);
 
     // Langkah 6: Simpan hasil ke cache Firestore untuk 30 hari ke depan

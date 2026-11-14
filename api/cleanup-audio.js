@@ -87,9 +87,11 @@ export default async function handler(req, res) {
       // Hapus dokumen audio
       batch.delete(audioDoc.ref);
 
-      // Perbarui flag hasAudio di report_private jika dokumen ada
+      // Perbarui flag hasAudio di report_private.
+      // Memakai set + merge (bukan update): update menggagalkan seluruh batch jika satu dokumen
+      // report_private tidak ada, sehingga cron akan gagal terus setiap malam.
       const privateDocRef = db.collection("report_private").doc(reportId);
-      batch.update(privateDocRef, { hasAudio: false });
+      batch.set(privateDocRef, { hasAudio: false }, { merge: true });
 
       deletedCount += 1;
     });

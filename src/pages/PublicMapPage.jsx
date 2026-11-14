@@ -223,7 +223,8 @@ function PublicMapPage() {
           <PublicReportMap
             reports={filteredReports}
             selectedReport={selectedReport}
-            onSelectReport={(rep) => setSelectedReport(rep)}
+            // Fungsi dikirim langsung (bukan fungsi baru tiap render) agar pin tidak dibangun ulang tiap klik
+            onSelectReport={setSelectedReport}
           />
 
           {/* Panel Rincian Laporan Terpilih (Floating Overlay di atas Peta) */}

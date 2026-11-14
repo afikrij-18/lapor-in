@@ -146,6 +146,30 @@ function MapController({ selectedReport, userLocation }) {
   return null;
 }
 
+// Komponen yang menyesuaikan tampilan awal peta ke sebaran laporan yang ada.
+// Tanpa ini peta selalu dibuka menampilkan seluruh Indonesia, walau semua laporan ada di satu kota.
+function FitToReports({ reports }) {
+  const map = useMap();
+  const hasFittedRef = useRef(false);
+
+  useEffect(() => {
+    // Langkah 1: Cukup sekali, saat laporan pertama kali selesai dimuat
+    if (hasFittedRef.current) return;
+
+    // Langkah 2: Kumpulkan titik laporan yang punya koordinat
+    const points = reports
+      .filter((report) => typeof report.latitude === "number" && typeof report.longitude === "number")
+      .map((report) => [report.latitude, report.longitude]);
+    if (points.length === 0) return;
+
+    // Langkah 3: Arahkan peta ke wilayah yang memuat semua titik itu
+    map.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 15 });
+    hasFittedRef.current = true;
+  }, [map, reports]);
+
+  return null;
+}
+
 // Komponen penampil layer cluster marker laporan
 function MarkerClusterLayer({ reports, onSelectReport }) {
   const map = useMap();
@@ -321,6 +345,7 @@ export function PublicReportMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <FitToReports reports={reports} />
         <MapController selectedReport={selectedReport} userLocation={userLocation} />
         <MarkerClusterLayer reports={reports} onSelectReport={onSelectReport} />
         <UserLocationMarker userLocation={userLocation} />
