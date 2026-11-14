@@ -21,7 +21,7 @@ export default defineConfig([
   },
   {
     // Vercel Serverless Functions, skrip bantu, dan file konfigurasi (Node.js ESM)
-    files: ['api/**/*.js', 'scripts/**/*.mjs', '*.config.js'],
+    files: ['api/**/*.js', 'scripts/**/*.mjs', '*.config.js', 'dev-api.mjs'],
     extends: [js.configs.recommended],
     languageOptions: {
       globals: globals.node,

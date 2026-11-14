@@ -106,6 +106,9 @@ Firebase Storage ternyata membutuhkan paket Blaze, sehingga tidak dipakai. Rinci
 | Serah terima halaman utama ke chat | Tidak diatur | Lewat `useReportDraft()`: `startDraft`, `updateDraft`, `resetDraft` | 7.5 |
 | Letak widget Turnstile | Halaman utama | Halaman chat, tempat `process-report` dipanggil | 3 |
 | Nama file aturan agent | Tidak ada | `AGENTS.md` | - |
+| Model Gemini (revisi ketiga) | Gemini 2.0 Flash | `gemini-3.5-flash`, cadangan `gemini-3.5-flash-lite` lalu `gemini-3.8-flash`. `gemini-2.5-flash` sudah tidak tersedia untuk API key baru | 4.2, 7.2 |
+| Batas waktu per percobaan model | Tidak ada | 15 detik (`process-report`), 10 detik (`chat-assistant`) | 4.2 |
+| Server API lokal | Tidak ada | `dev-api.mjs` menjalankan folder `api/` tanpa Vercel CLI; Vite meneruskan `/api/*` ke sana | - |
 
 ## 6. Kontrak Data
 

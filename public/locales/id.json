@@ -60,7 +60,11 @@
     "invalidReport": "Maaf, laporan Anda tidak terdengar jelas. Silakan rekam ulang atau ketik laporan Anda.",
     "ticketTitle": "Laporan Anda Terkirim",
     "ticketLabel": "Kode Tiket Pelacakan",
-    "ticketHint": "Simpan kode ini untuk melacak laporan Anda."
+    "ticketHint": "Simpan kode ini untuk melacak laporan Anda.",
+    "listen": "Dengarkan",
+    "locationDenied": "Lokasi perangkat tidak dapat diambil. Silakan tentukan lokasi dengan mengetuk peta.",
+    "pickPointHint": "Ketuk peta atau geser pin untuk menentukan lokasi kejadian.",
+    "welcome": "Halo! Silakan ceritakan masalah lingkungan yang ingin Anda laporkan."
   },
   "report": {
     "title": "Judul",

@@ -15,6 +15,12 @@
 // - startDraft({ inputMode, audioBlob }) : memulai draf baru dari halaman utama
 // - updateDraft(fields)  : mengubah sebagian isi draf
 // - resetDraft()         : mengosongkan draf, misalnya setelah laporan terkirim
+//
+// Tambahan untuk halaman chat:
+// - messages, addMessage(role, text)        : riwayat percakapan; role "user" atau "model"
+// - photoFile, photoPreviewUrl              : foto hasil kompresi dan URL pratinjaunya
+// - attachPhoto(file, previewUrl), removePhoto()
+// - isProcessing, setIsProcessing           : penanda AI sedang memproses
 
 import { createContext, useContext } from "react";
 

@@ -20,7 +20,7 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
 - **Backend & AI SDK**:
   - Client Firebase SDK: `firebase` `^13.3` (Auth dan Firestore). **Firebase Storage TIDAK dipakai** karena membutuhkan paket Blaze; foto dan rekaman disimpan di Firestore sebagai `Bytes`.
   - Server Firebase SDK: `firebase-admin` `^14.5` (verifikasi admin & cron cleanup).
-  - Server AI SDK: `@google/genai` `^3.3` menggunakan model **`gemini-2.5-flash`** (tier gratis).
+  - Server AI SDK: `@google/genai` `^3.3` menggunakan model **`gemini-3.5-flash`** (tier gratis).
 - **Aturan Dependency & Linter**:
   - **DILARANG** menginstal package tambahan secara sepihak (`npm install <nama-package>`). Gunakan hanya library yang tercantum di `package.json` dan `package-lock.json` repositori.
   - Linter menggunakan **ESLint 10+ Flat Config** (`eslint.config.js`). Setiap perubahan kode **wajib menghasilkan 0 errors dan 0 warnings** saat menjalankan `npm run lint`.
@@ -35,7 +35,7 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
    - Seluruh komentar penjelas di dalam kode (baik frontend maupun serverless `api/*.js`) **WAJIB menggunakan bahasa Indonesia** yang ramah pemula, komunikatif, dan memiliki nomor urut langkah:
      ```javascript
      // Langkah 1: Validasi token Cloudflare Turnstile dari header request
-     // Langkah 2: Kirim rekaman audio ke Gemini 2.5 Flash dengan schema terkunci
+     // Langkah 2: Kirim rekaman audio ke Gemini 3.5 Flash dengan schema terkunci
      // Langkah 3: Kembalikan draf terstruktur ke frontend
      ```
 3. **Pemisahan Error Developer vs Pengguna (WAJIB)**:
@@ -103,13 +103,13 @@ Dokumen ini berisi instruksi dan aturan kerja wajib (*mandatory rules*) bagi sel
 ## 5. Aturan AI, Efisiensi Token (7 Strategi Wajib), & Alur Gagal
 
 1. **Aksesibilitas Suara & Normalisasi Gangguan Bicara**:
-   - System prompt pada `/api/process-report` wajib menginstruksikan Gemini 2.5 Flash untuk mengabaikan kebisingan latar (*ambient noise*), melakukan **disfluency normalization** (merapikan ucapan gagap/pengulangan suku kata tanpa mengubah makna), menerjemahkan bahasa daerah (misal bahasa Minang) ke bahasa Indonesia baku, serta menandai `isValidReport: false` jika rekaman hanya berisi suara bising/kosong.
+   - System prompt pada `/api/process-report` wajib menginstruksikan Gemini 3.5 Flash untuk mengabaikan kebisingan latar (*ambient noise*), melakukan **disfluency normalization** (merapikan ucapan gagap/pengulangan suku kata tanpa mengubah makna), menerjemahkan bahasa daerah (misal bahasa Minang) ke bahasa Indonesia baku, serta menandai `isValidReport: false` jika rekaman hanya berisi suara bising/kosong.
 2. **7 Strategi Wajib Efisiensi Token AI**:
    - **Sliding Window History**: `/api/chat-assistant` hanya boleh mengirim maksimal **4 pesan terakhir** ke Gemini API.
    - **State-Driven Context Injection**: Kirim ringkasan state draf laporan dalam JSON padat (`< 120 token`) di setiap request, bukan riwayat panjang.
    - **Rule-Based Shortcut (0 Token)**: Klik tombol cepat di UI (`"Lewati Foto"`, `"Gunakan GPS"`, `"Edit Field"` inline, `"Kirim Laporan"`) wajib memperbarui state lokal React tanpa memanggil API Gemini.
    - **Batas Durasi Audio 120 Detik**: Batasi durasi rekaman agar konsumsi token audio tetap terkendali.
-   - **Locked JSON Schema**: Wajib gunakan `responseSchema` terkunci. Batas keluaran: `maxOutputTokens: 1024` untuk `/api/process-report` dan `maxOutputTokens: 350` untuk `/api/chat-assistant`. Kedua endpoint wajib memakai `thinkingConfig: { thinkingBudget: 0 }`, karena token "thinking" Gemini 2.5 Flash ikut memakan jatah keluaran dan dapat memotong JSON.
+   - **Locked JSON Schema**: Wajib gunakan `responseSchema` terkunci. Batas keluaran: `maxOutputTokens: 1024` untuk `/api/process-report` dan `maxOutputTokens: 350` untuk `/api/chat-assistant`. Kedua endpoint wajib memakai `thinkingConfig: { thinkingBudget: 0 }`, karena token "thinking" Gemini 3.5 Flash ikut memakan jatah keluaran dan dapat memotong JSON. Pengecualian: model cadangan `gemini-3.5-flash-lite` menolak pengaturan itu (error 400), jadi untuk model lite pengaturannya tidak dikirim. Urutan model: `gemini-3.5-flash`, lalu `gemini-3.5-flash-lite`, lalu `gemini-3.8-flash` (dapat diganti lewat `GEMINI_MODEL`). **DILARANG** memakai `gemini-2.5-flash`: model itu sudah tidak tersedia untuk API key baru.
    - **System Instruction Padat (`< 250 token`)**: Pisahkan teks input pengguna secara eksplisit di dalam prompt untuk mencegah *prompt injection*.
    - **Geocoding Tanpa AI**: Reverse geocoding menggunakan `/api/reverse-geocode` yang mengecek cache Firestore `geocode_cache/{geohash}` (presisi 7, berlaku 30 hari) dan mengantrekan request ke OSM Nominatim dengan jeda minimal `1100 ms`.
 3. **Penanganan Alur Gagal (Zero Dead-End Policy)**:
