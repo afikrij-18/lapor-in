@@ -10,7 +10,10 @@ import { TurnstileContext } from "../hooks/useTurnstileToken.js";
 
 // Batas menunggu token jika widget belum selesai. Setelah itu request dikirim tanpa token
 // dan server yang memutuskan; alur gagal ("Coba Lagi") tetap tersedia bagi warga.
-const TOKEN_WAIT_MS = 15000;
+// Token pertama biasanya sudah siap sejak halaman utama. Token BERIKUTNYA (setelah yang
+// pertama terpakai) terukur butuh sekitar 20 detik untuk dibuat ulang oleh Cloudflare,
+// jadi batas 15 detik terlalu pendek untuk pengiriman kedua yang berdekatan.
+const TOKEN_WAIT_MS = 40000;
 
 export function TurnstileProvider({ children }) {
   const widgetRef = useRef(null);
