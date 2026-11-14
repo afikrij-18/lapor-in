@@ -392,8 +392,10 @@ function ChatPageContent() {
   // Langkah 9: Tampilan sukses dengan Kode Tiket Pelacakan setelah laporan terkirim
   if (submittedTicket) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#F5F5F5] px-4 py-8">
-        <div className="w-full max-w-lg rounded-2xl border-2 border-[#0A0A0A] bg-[#FFFFFF] p-6 text-center shadow-sm sm:p-8">
+      // fixed inset-0: menempel ke layar yang terlihat. m-auto pada kartu menaruhnya di tengah,
+      // dan tetap bisa digulir jika layarnya pendek.
+      <div className="fixed inset-0 flex overflow-y-auto bg-[#F5F5F5] px-4 py-8">
+        <div className="m-auto w-full max-w-lg rounded-2xl border-2 border-[#0A0A0A] bg-[#FFFFFF] p-6 text-center shadow-sm sm:p-8">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0A0A0A] text-[#FFFFFF]">
             <CheckCircle2 className="h-9 w-9" />
           </div>
@@ -464,7 +466,9 @@ function ChatPageContent() {
     submitErrorCode === "PHOTO_TOO_LARGE" || submitErrorCode === "AUDIO_TOO_LARGE";
 
   return (
-    <div className="flex h-dvh flex-col bg-[#F5F5F5]">
+    // fixed inset-0: halaman menempel ke keempat sisi layar yang terlihat, tidak bergantung pada
+    // tinggi pembungkus di App.jsx. Tanpa ini, di HP muncul ruang kosong di bawah kolom ketik.
+    <div className="fixed inset-0 flex flex-col bg-[#F5F5F5]">
       {/* Langkah 10: Header halaman chat dengan tombol kembali dan kontrol suara TTS */}
       <header className="shrink-0 border-b border-[#D4D4D4] bg-[#0A0A0A] px-4 py-3 text-[#FFFFFF]">
         {/* Tiga kolom: kiri dan kanan sama lebar agar judul tepat di tengah. Di HP hanya ikon */}
@@ -700,7 +704,7 @@ function ChatPageContent() {
       </ChatWindow>
 
       {/* Langkah 12: Bilah bawah. Baris 1: kirim laporan (0 token AI). Baris 2: kolom ketik pesan */}
-      <div className="shrink-0 border-t border-[#D4D4D4] bg-[#FFFFFF] px-4 py-3">
+      <div className="shrink-0 border-t border-[#D4D4D4] bg-[#FFFFFF] px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-3xl space-y-2.5">
           {hasDraftReady && (
             <button
