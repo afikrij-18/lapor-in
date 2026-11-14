@@ -16,10 +16,12 @@ export function TurnstileProvider({ children }) {
   const widgetRef = useRef(null);
   const tokenRef = useRef("");
   const waitersRef = useRef([]);
+  const lastErrorCodeRef = useRef("");
 
   // Langkah 1: Simpan token baru dan serahkan ke pemanggil yang sedang menunggu
   const handleSuccess = useCallback((token) => {
     tokenRef.current = token;
+    lastErrorCodeRef.current = "";
     waitersRef.current.forEach((resolveWaiter) => resolveWaiter(token));
     waitersRef.current = [];
   }, []);
@@ -29,7 +31,12 @@ export function TurnstileProvider({ children }) {
   const handleError = useCallback((errorCode) => {
     console.error("Error pada TurnstileWidget (kode Cloudflare):", errorCode);
     tokenRef.current = "";
+    lastErrorCodeRef.current = String(errorCode || "");
   }, []);
+
+  // Kode error terakhir dari widget ("" jika tidak ada). Ditampilkan di samping pesan
+  // "Verifikasi keamanan gagal" agar penyebabnya bisa dilacak tanpa membuka console.
+  const getLastErrorCode = useCallback(() => lastErrorCodeRef.current, []);
 
   // Token kedaluwarsa (sekitar 5 menit): buang, jangan sampai terkirim ke server.
   // Widget memperbaruinya sendiri dan memanggil handleSuccess dengan token baru.
@@ -65,7 +72,7 @@ export function TurnstileProvider({ children }) {
     });
   }, []);
 
-  const value = useMemo(() => ({ takeToken }), [takeToken]);
+  const value = useMemo(() => ({ takeToken, getLastErrorCode }), [takeToken, getLastErrorCode]);
 
   return (
     <TurnstileContext.Provider value={value}>

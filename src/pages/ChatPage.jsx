@@ -53,7 +53,10 @@ function ChatPageContent() {
 
   // Token Cloudflare Turnstile diambil dari penyedia di App.jsx. Widget sudah dipasang sejak
   // halaman utama, jadi token biasanya sudah siap saat halaman chat dibuka.
-  const { takeToken: takeTurnstileToken } = useTurnstileToken();
+  const { takeToken: takeTurnstileToken, getLastErrorCode: getTurnstileErrorCode } =
+    useTurnstileToken();
+  // Kode error widget saat verifikasi keamanan gagal ("" jika tidak ada), untuk ditampilkan
+  const [turnstileErrorCode, setTurnstileErrorCode] = useState("");
 
   const [inputText, setInputText] = useState("");
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -151,6 +154,7 @@ function ChatPageContent() {
       } catch (error) {
         const code = error?.code || "AI_UNAVAILABLE";
         setProcessErrorCode(code);
+        setTurnstileErrorCode(code === "TURNSTILE_FAILED" ? getTurnstileErrorCode() || "-" : "");
         setProcessRetryCount((prev) => prev + 1);
         const errMsg = t(`errors.${code}`);
         addMessage("model", errMsg);
@@ -159,7 +163,15 @@ function ChatPageContent() {
         setIsProcessing(false);
       }
     },
-    [addMessage, setIsProcessing, speakText, t, takeTurnstileToken, updateDraft]
+    [
+      addMessage,
+      getTurnstileErrorCode,
+      setIsProcessing,
+      speakText,
+      t,
+      takeTurnstileToken,
+      updateDraft,
+    ]
   );
 
   // Langkah 3: Saat halaman dibuka, baca draf yang dimulai halaman utama lewat startDraft().
@@ -499,6 +511,11 @@ function ChatPageContent() {
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#DC2626]" />
               <span>{t(`errors.${processErrorCode}`)}</span>
             </div>
+            {turnstileErrorCode && (
+              <p className="mt-1 text-base text-[#0A0A0A]">
+                {t("chat.securityErrorCode", { code: turnstileErrorCode })}
+              </p>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               {processRetryCount < 2 && (
                 <button
