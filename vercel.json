@@ -5,6 +5,11 @@
       "destination": "/index.html"
     }
   ],
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cleanup-audio",
