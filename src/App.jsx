@@ -1,47 +1,29 @@
-/* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { LanguageProvider } from './context/LanguageContext';
+import HomePage from './pages/HomePage';
 
-// Kamus terpusat Bahasa Indonesia (sesuai id.json)
-const idDictionary = {
-  home: {
-    title: "Suarakan Masalah Lingkungan Anda Secara Aman",
-    subtitle: "Tanpa Login Rumit • Mendukung Bahasa Daerah & Suara",
-    micButton: "Tekan & Ceritakan Masalah Landing",
-    manualInputBtn: "Ketik Laporan Secara Manual",
-    retentionNotice: "Rekaman suara disimpan maksimal 30 hari untuk verifikasi admin."
-  }
-};
-
-const LanguageContext = createContext();
-
-export function LanguageProvider({ children }) {
-  const [locale] = useState('id');
-
-  // Fungsi helper untuk mengambil teks berdasarkan path (contoh: 'home.title')
-  const t = (path) => {
-    const keys = path.split('.');
-    let value = idDictionary;
-    for (const k of keys) {
-      if (value && value[k]) {
-        value = value[k];
-      } else {
-        return '';
-      }
-    }
-    return value;
-  };
-
+// Komponen placeholder sementara untuk halaman lain yang sedang dikerjakan anggota tim lain
+function PlaceholderPage({ title }) {
   return (
-    <LanguageContext.Provider value={{ locale, t }}>
-      {children}
-    </LanguageContext.Provider>
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center">
+      <h1 className="text-xl font-bold">{title} (Dalam Tahap Pengembangan)</h1>
+    </div>
   );
 }
 
-export function useLanguage() {
-  const context = useContext(LanguageContext);
-  if (!context) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
-  }
-  return context;
+export default function App() {
+  return (
+    <LanguageProvider>
+      <BrowserRouter>
+        {/* Langkah 1: Konfigurasi rute halaman Lapor.in sesuai spesifikasi PRD */}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/chat" element={<PlaceholderPage title="Halaman Chat Interaktif AI" />} />
+          <Route path="/peta" element={<PlaceholderPage title="Halaman Peta Sebaran Publik" />} />
+          <Route path="/admin/login" element={<PlaceholderPage title="Login Admin Lapor.in" />} />
+          <Route path="/admin" element={<PlaceholderPage title="Dashboard Admin" />} />
+        </Routes>
+      </BrowserRouter>
+    </LanguageProvider>
+  );
 }
