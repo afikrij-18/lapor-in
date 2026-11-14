@@ -98,7 +98,14 @@ async function parseJsonBody(req) {
 async function verifyTurnstile(token, remoteIp) {
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
   if (!secretKey) {
-    return process.env.NODE_ENV !== "production";
+    // Tanpa secret key: di laptop verifikasi dilewati, di produksi semua permintaan ditolak
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "Turnstile gagal: TURNSTILE_SECRET_KEY belum diisi di environment variable server"
+      );
+      return false;
+    }
+    return true;
   }
   if (!token) {
     // Token kosong berarti widget Turnstile di halaman chat tidak menghasilkan token
