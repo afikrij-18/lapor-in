@@ -21,9 +21,9 @@ import ChatWindow from "../components/chat/ChatWindow.jsx";
 import LocationPickerModal from "../components/chat/LocationPickerModal.jsx";
 import PhotoUploadInput from "../components/chat/PhotoUploadInput.jsx";
 import ReportPreviewCard from "../components/chat/ReportPreviewCard.jsx";
-import TurnstileWidget from "../components/common/TurnstileWidget.jsx";
 import { useLanguage } from "../hooks/useLanguage.js";
 import { useReportDraft } from "../hooks/useReportDraft.js";
+import { useTurnstileToken } from "../hooks/useTurnstileToken.js";
 import {
   processReport,
   reverseGeocode,
@@ -51,46 +51,9 @@ function ChatPageContent() {
     resetDraft,
   } = useReportDraft();
 
-  // Token Cloudflare Turnstile. Token hanya berlaku sekali, jadi setiap pemanggilan
-  // /api/process-report mengambil token yang ada lalu meminta token baru dari widget.
-  const turnstileRef = useRef(null);
-  const turnstileTokenRef = useRef("");
-  const tokenWaitersRef = useRef([]);
-
-  const handleTurnstileSuccess = useCallback((token) => {
-    turnstileTokenRef.current = token;
-    tokenWaitersRef.current.forEach((resolveWaiter) => resolveWaiter(token));
-    tokenWaitersRef.current = [];
-  }, []);
-
-  // Mengambil token Turnstile. Jika widget belum selesai, menunggu paling lama 6 detik;
-  // setelah itu lanjut tanpa token dan server yang memutuskan (alur gagal tetap tersedia).
-  const takeTurnstileToken = useCallback(() => {
-    return new Promise((resolve) => {
-      const finish = (token) => {
-        turnstileTokenRef.current = "";
-        if (turnstileRef.current) {
-          turnstileRef.current.reset();
-        }
-        resolve(token);
-      };
-
-      if (turnstileTokenRef.current) {
-        finish(turnstileTokenRef.current);
-        return;
-      }
-
-      const waiter = (token) => {
-        clearTimeout(timer);
-        finish(token);
-      };
-      const timer = setTimeout(() => {
-        tokenWaitersRef.current = tokenWaitersRef.current.filter((item) => item !== waiter);
-        finish("");
-      }, 6000);
-      tokenWaitersRef.current.push(waiter);
-    });
-  }, []);
+  // Token Cloudflare Turnstile diambil dari penyedia di App.jsx. Widget sudah dipasang sejak
+  // halaman utama, jadi token biasanya sudah siap saat halaman chat dibuka.
+  const { takeToken: takeTurnstileToken } = useTurnstileToken();
 
   const [inputText, setInputText] = useState("");
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -103,7 +66,9 @@ function ChatPageContent() {
   const [processErrorCode, setProcessErrorCode] = useState("");
   const [processRetryCount, setProcessRetryCount] = useState(0);
   const [forceManualCard, setForceManualCard] = useState(false);
-  const [isInvalidReportState, setIsInvalidReportState] = useState(false);
+  // Kunci pesan laporan tidak valid: "" (tidak ada), "chat.invalidReport" (rekaman),
+  // atau "chat.invalidText" (ketikan)
+  const [invalidMessageKey, setInvalidMessageKey] = useState("");
   const [submitErrorCode, setSubmitErrorCode] = useState("");
   const [submittedTicket, setSubmittedTicket] = useState(null);
 
@@ -154,7 +119,7 @@ function ChatPageContent() {
     async ({ audioBlob, textInput }) => {
       setIsProcessing(true);
       setProcessErrorCode("");
-      setIsInvalidReportState(false);
+      setInvalidMessageKey("");
 
       try {
         const token = await takeTurnstileToken();
@@ -167,8 +132,9 @@ function ChatPageContent() {
         // Alur gagal: AI menandai laporan tidak valid atau tidak terdengar jelas.
         // Draf TIDAK diisi, sehingga kartu pratinjau tidak tampil (PRD bagian 3, Alur Gagal)
         if (!result.draft.isValidReport || result.draft.audioQuality === "unusable") {
-          setIsInvalidReportState(true);
-          const invalidMsg = t("chat.invalidReport");
+          const messageKey = audioBlob ? "chat.invalidReport" : "chat.invalidText";
+          setInvalidMessageKey(messageKey);
+          const invalidMsg = t(messageKey);
           addMessage("model", invalidMsg);
           speakText(invalidMsg);
           return;
@@ -230,6 +196,7 @@ function ChatPageContent() {
 
   function handleActivateManualCard() {
     setProcessErrorCode("");
+    setInvalidMessageKey("");
     setForceManualCard(true);
     setShowPhotoBox(true);
     updateDraft({
@@ -555,20 +522,23 @@ function ChatPageContent() {
           </div>
         )}
 
-        {isInvalidReportState && (
+        {invalidMessageKey && (
           <div className="rounded-xl border border-[#DC2626] bg-[#FEE2E2] p-4">
             <p className="text-base font-medium text-[#0A0A0A]">
-              {t("chat.invalidReport")}
+              {t(invalidMessageKey)}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => navigate("/")}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#DC2626] px-4 py-2 text-base font-bold text-[#FFFFFF] hover:bg-[#B91C1C]"
-              >
-                <Mic className="h-4 w-4" />
-                <span>{t("chat.reRecord")}</span>
-              </button>
+              {/* Tombol rekam ulang hanya relevan jika laporan berasal dari rekaman */}
+              {invalidMessageKey === "chat.invalidReport" && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#DC2626] px-4 py-2 text-base font-bold text-[#FFFFFF] hover:bg-[#B91C1C]"
+                >
+                  <Mic className="h-4 w-4" />
+                  <span>{t("chat.reRecord")}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleActivateManualCard}
@@ -718,9 +688,6 @@ function ChatPageContent() {
           </form>
         </div>
       </div>
-
-      {/* Widget Turnstile tak terlihat: menyediakan token anti-bot untuk /api/process-report */}
-      <TurnstileWidget ref={turnstileRef} onSuccess={handleTurnstileSuccess} />
 
       {/* Langkah 13: Modal pemilih lokasi interaktif dan fallback manual */}
       <LocationPickerModal

@@ -72,7 +72,7 @@ Antarmuka Lapor.in menggunakan skema kontras tinggi **Hitam, Merah, Putih** untu
 
 ### Langkah 1: Halaman Utama (Homepage - `/`)
 
-1. Pengguna membuka aplikasi Lapor.in. Sistem secara otomatis melakukan **Firebase Silent Anonymous Auth** di latar belakang. Widget **Cloudflare Turnstile** tidak dimuat di halaman ini, melainkan di halaman `/chat`, tempat `/api/process-report` dipanggil: token Turnstile hanya berlaku sekali, sehingga tombol "Coba Lagi" membutuhkan token baru dari widget di halaman yang sama.
+1. Pengguna membuka aplikasi Lapor.in. Sistem secara otomatis melakukan **Firebase Silent Anonymous Auth** di latar belakang. Widget **Cloudflare Turnstile** (tak terlihat) dipasang satu kali di tingkat aplikasi (`TurnstileProvider` di `App.jsx`), bukan di tiap halaman, sehingga token sudah siap sejak warga berada di halaman ini. Token hanya berlaku sekali; setiap kali terpakai, widget diminta membuat token baru, termasuk untuk tombol "Coba Lagi".
 2. Di tengah layar terdapat **Tombol Mikrofon Besar** berwarna Merah (`#DC2626`) bertuliskan *"Tekan & Ceritakan Masalah Anda"*.
 3. Tepat di bawah tombol mikrofon terdapat **Tombol Sekunder Input Manual** berwarna Putih berbingkai Hitam (`#0A0A0A`) bertuliskan *"Ketik Laporan Secara Manual"*.
 4. Pengguna memilih salah satu cara:
@@ -510,7 +510,7 @@ Aturan serah terima:
 
 - Halaman utama **tidak** mengirim data lewat state navigasi; ia memanggil `startDraft(...)` lalu `navigate("/chat")`.
 - Jika `/chat` dibuka saat `inputMode` bernilai `null` (misalnya setelah halaman dimuat ulang), warga dikembalikan ke halaman utama.
-- Token Turnstile tidak ikut diserahterimakan. `TurnstileWidget` dipasang di halaman chat, dan tokennya diteruskan ke `processReport`.
+- Token Turnstile tidak ikut diserahterimakan. Halaman chat mengambilnya lewat `const { takeToken } = useTurnstileToken()` (`src/hooks/useTurnstileToken.js`), lalu meneruskannya ke `processReport`. `takeToken()` mengembalikan Promise berisi token; jika widget belum selesai, ia menunggu paling lama 15 detik. Halaman dan komponen tidak memasang `TurnstileWidget` sendiri.
 
 ---
 

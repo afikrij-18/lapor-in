@@ -101,6 +101,8 @@ async function verifyTurnstile(token, remoteIp) {
     return process.env.NODE_ENV !== "production";
   }
   if (!token) {
+    // Token kosong berarti widget Turnstile di halaman chat tidak menghasilkan token
+    console.error("Turnstile gagal: token kosong (widget di browser tidak mengeluarkan token)");
     return false;
   }
 
@@ -120,6 +122,10 @@ async function verifyTurnstile(token, remoteIp) {
       }
     );
     const result = await verifyResponse.json();
+    if (!result.success) {
+      // Kode error dari Cloudflare hanya dicatat di log server, tidak dikirim ke warga
+      console.error("Turnstile gagal: token ditolak Cloudflare:", result["error-codes"]);
+    }
     return Boolean(result.success);
   } catch (error) {
     console.error("Error pada verifikasi Cloudflare Turnstile:", error);

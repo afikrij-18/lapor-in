@@ -6,6 +6,7 @@ import Footer from "./components/common/Footer.jsx";
 import RequireAdmin from "./components/common/RequireAdmin.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { ReportDraftProvider } from "./context/ReportDraftContext.jsx";
+import { TurnstileProvider } from "./context/TurnstileContext.jsx";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
 import AdminLoginPage from "./pages/AdminLoginPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
@@ -26,6 +27,8 @@ function App() {
     <LanguageProvider>
       {/* Draf laporan dibagi antara halaman utama (memulai) dan halaman chat (mengisi) */}
       <ReportDraftProvider>
+      {/* Widget anti-bot dipasang sekali di sini agar token siap sebelum halaman chat dibuka */}
+      <TurnstileProvider>
       <BrowserRouter>
         <div className="flex min-h-screen flex-col">
           <div className="flex-1">
@@ -50,6 +53,7 @@ function App() {
           <Footer />
         </div>
       </BrowserRouter>
+      </TurnstileProvider>
       </ReportDraftProvider>
     </LanguageProvider>
   );
