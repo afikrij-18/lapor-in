@@ -1,8 +1,10 @@
 // Komponen gelembung percakapan untuk pesan asisten AI (#171717) dan warga (#FFFFFF).
 
 import { Bot, User, Volume2 } from "lucide-react";
+import { useLanguage } from "../../hooks/useLanguage.js";
 
 export default function ChatBubble({ message, onSpeak }) {
+  const { t } = useLanguage();
   const isAi = message.role === "model";
 
   // Langkah 1: Format waktu singkat dari timestamp pesan
@@ -48,10 +50,11 @@ export default function ChatBubble({ message, onSpeak }) {
             <button
               type="button"
               onClick={() => onSpeak(message.text)}
+              aria-label={t("chat.listen")}
               className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-[#FFFFFF] hover:bg-[#0A0A0A] focus:outline-2 focus:outline-[#DC2626]"
             >
               <Volume2 className="h-3.5 w-3.5" />
-              <span>Dengarkan</span>
+              <span>{t("chat.listen")}</span>
             </button>
           )}
           {formattedTime && <span>{formattedTime}</span>}

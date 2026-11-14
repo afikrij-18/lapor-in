@@ -39,6 +39,31 @@ const RESPONSE_SCHEMA = {
   required: ["updatedFields", "aiMessage"],
 };
 
+// Parsing JSON aman untuk mengatasi format markdown code fences dari model AI
+function safeParseJson(rawText) {
+  if (!rawText || typeof rawText !== "string") {
+    throw new Error("Teks balasan AI kosong.");
+  }
+  const clean = rawText
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  return JSON.parse(clean);
+}
+
+// Membaca body JSON secara fleksibel baik di serverless runtime maupun lokal
+async function parseJsonBody(req) {
+  if (req.body) {
+    return typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  }
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  const raw = Buffer.concat(chunks).toString("utf8");
+  return raw ? JSON.parse(raw) : {};
+}
+
 // Mengirim balasan error seragam dan mencatat detail teknis di log server
 function sendError(res, status, code, userMessage, devError = null) {
   if (devError) {
@@ -60,7 +85,7 @@ export default async function handler(req, res) {
 
   try {
     // Langkah 1: Validasi payload pesan warga
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const body = await parseJsonBody(req);
     const userMessage = typeof body.userMessage === "string" ? body.userMessage.trim() : "";
     const currentDraft = body.currentDraft || {};
 
@@ -116,21 +141,49 @@ ${historyText || "(Belum ada)"}
 ${userMessage.slice(0, 600)}
 </pesan_warga>`;
 
-    // Langkah 3: Panggil Gemini 2.5 Flash dengan JSON schema terkunci
+    // Langkah 3: Panggil Gemini dengan JSON schema terkunci dan auto-fallback saat server sibuk (503)
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-        maxOutputTokens: 350,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    });
+    const candidateModels = [
+      process.env.GEMINI_MODEL || "gemini-3.8-flash",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+    ];
+    const modelConfig = {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+      maxOutputTokens: 350,
+    };
 
-    const parsed = JSON.parse(response.text);
+    let response = null;
+    let lastError = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: modelConfig,
+        });
+        break;
+      } catch (err) {
+        lastError = err;
+        const status = err?.status;
+        if (status === 503 || status === 404 || status === 429) {
+          console.warn(
+            `Model ${modelName} tidak tersedia (${status}), mencoba model berikutnya...`
+          );
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error("Seluruh model Gemini sedang sibuk.");
+    }
+
+    const parsed = safeParseJson(response.text);
     const rawUpdates = parsed.updatedFields || {};
     const sanitizedUpdates = {};
 

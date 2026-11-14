@@ -1,5 +1,3 @@
-// Kartu pratinjau draf laporan dengan fitur edit inline (0 token AI) dan penanda prioritas darurat.
-
 import { useState } from "react";
 import {
   AlertTriangle,
@@ -28,18 +26,31 @@ export default function ReportPreviewCard({
 }) {
   const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
-  const [formState, setFormState] = useState(() => ({
-    title: draft.title || "",
-    category: draft.category || "Lainnya",
-    urgency: draft.urgency || URGENCY_LEVELS.NORMAL,
-    summary: draft.summary || "",
-    address: draft.address || "",
-  }));
+  const [formState, setFormState] = useState(null);
 
   const isEmergency = draft.urgency === URGENCY_LEVELS.EMERGENCY;
   const activeEditing = isEditing || forceEditMode;
 
-  // Langkah 1: Buka form edit dengan menyalin nilai draf terbaru saat tombol diklik
+  // Langkah 1: Turunkan nilai form dari draf laporan aktif atau edit lokal pengguna
+  const currentTitle = formState?.title ?? draft.title ?? "";
+  const currentCategory = formState?.category ?? draft.category ?? "Lainnya";
+  const currentUrgency = formState?.urgency ?? draft.urgency ?? URGENCY_LEVELS.NORMAL;
+  const currentSummary = formState?.summary ?? draft.summary ?? "";
+  const currentAddress = formState?.address ?? draft.address ?? "";
+
+  function updateFormField(field, value) {
+    setFormState((prev) => ({
+      title: currentTitle,
+      category: currentCategory,
+      urgency: currentUrgency,
+      summary: currentSummary,
+      address: currentAddress,
+      ...prev,
+      [field]: value,
+    }));
+  }
+
+  // Langkah 2: Buka form edit dengan menyalin nilai draf terbaru saat tombol diklik
   function handleStartEdit() {
     setFormState({
       title: draft.title || "",
@@ -51,20 +62,22 @@ export default function ReportPreviewCard({
     setIsEditing(true);
   }
 
-  // Langkah 2: Simpan perubahan field ke ReportDraftContext tanpa memanggil API Gemini
+  // Langkah 3: Simpan perubahan field ke ReportDraftContext tanpa memanggil API Gemini
   function handleSave(event) {
     event.preventDefault();
     onSaveEdit({
-      title: formState.title.trim().slice(0, MAX_TITLE_LENGTH),
-      category: formState.category,
-      urgency: formState.urgency,
-      summary: formState.summary.trim().slice(0, MAX_SUMMARY_LENGTH),
-      address: formState.address.trim().slice(0, 250),
+      title: currentTitle.trim().slice(0, MAX_TITLE_LENGTH),
+      category: currentCategory,
+      urgency: currentUrgency,
+      summary: currentSummary.trim().slice(0, MAX_SUMMARY_LENGTH),
+      address: currentAddress.trim().slice(0, 250),
     });
+    setFormState(null);
     setIsEditing(false);
   }
 
   function handleCancel() {
+    setFormState(null);
     setIsEditing(false);
   }
 
@@ -124,10 +137,8 @@ export default function ReportPreviewCard({
               type="text"
               required
               maxLength={MAX_TITLE_LENGTH}
-              value={formState.title}
-              onChange={(e) =>
-                setFormState((prev) => ({ ...prev, title: e.target.value }))
-              }
+              value={currentTitle}
+              onChange={(e) => updateFormField("title", e.target.value)}
               className="w-full rounded-lg border border-[#D4D4D4] bg-[#FFFFFF] px-3 py-2 text-base text-[#0A0A0A] focus:border-[#0A0A0A] focus:outline-none"
             />
           </div>
@@ -138,10 +149,8 @@ export default function ReportPreviewCard({
                 {t("report.category")}
               </label>
               <select
-                value={formState.category}
-                onChange={(e) =>
-                  setFormState((prev) => ({ ...prev, category: e.target.value }))
-                }
+                value={currentCategory}
+                onChange={(e) => updateFormField("category", e.target.value)}
                 className="w-full rounded-lg border border-[#D4D4D4] bg-[#FFFFFF] px-3 py-2 text-base text-[#0A0A0A] focus:border-[#0A0A0A] focus:outline-none"
               >
                 {REPORT_CATEGORIES.map((category) => (
@@ -157,10 +166,8 @@ export default function ReportPreviewCard({
                 {t("report.urgency")}
               </label>
               <select
-                value={formState.urgency}
-                onChange={(e) =>
-                  setFormState((prev) => ({ ...prev, urgency: e.target.value }))
-                }
+                value={currentUrgency}
+                onChange={(e) => updateFormField("urgency", e.target.value)}
                 className="w-full rounded-lg border border-[#D4D4D4] bg-[#FFFFFF] px-3 py-2 text-base text-[#0A0A0A] focus:border-[#0A0A0A] focus:outline-none"
               >
                 {Object.values(URGENCY_LEVELS).map((level) => (
@@ -180,10 +187,8 @@ export default function ReportPreviewCard({
               rows={3}
               required
               maxLength={MAX_SUMMARY_LENGTH}
-              value={formState.summary}
-              onChange={(e) =>
-                setFormState((prev) => ({ ...prev, summary: e.target.value }))
-              }
+              value={currentSummary}
+              onChange={(e) => updateFormField("summary", e.target.value)}
               className="w-full rounded-lg border border-[#D4D4D4] bg-[#FFFFFF] px-3 py-2 text-base text-[#0A0A0A] focus:border-[#0A0A0A] focus:outline-none"
             />
           </div>
@@ -195,10 +200,8 @@ export default function ReportPreviewCard({
             <input
               type="text"
               maxLength={250}
-              value={formState.address}
-              onChange={(e) =>
-                setFormState((prev) => ({ ...prev, address: e.target.value }))
-              }
+              value={currentAddress}
+              onChange={(e) => updateFormField("address", e.target.value)}
               className="w-full rounded-lg border border-[#D4D4D4] bg-[#FFFFFF] px-3 py-2 text-base text-[#0A0A0A] focus:border-[#0A0A0A] focus:outline-none"
             />
           </div>

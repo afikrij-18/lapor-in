@@ -69,6 +69,31 @@ function sendError(res, status, code, userMessage, devError = null) {
   });
 }
 
+// Parsing JSON aman untuk mengatasi format markdown code fences dari model AI
+function safeParseJson(rawText) {
+  if (!rawText || typeof rawText !== "string") {
+    throw new Error("Teks balasan AI kosong.");
+  }
+  const clean = rawText
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  return JSON.parse(clean);
+}
+
+// Membaca body JSON secara fleksibel baik di serverless runtime maupun lokal
+async function parseJsonBody(req) {
+  if (req.body) {
+    return typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  }
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  const raw = Buffer.concat(chunks).toString("utf8");
+  return raw ? JSON.parse(raw) : {};
+}
+
 // Memverifikasi token Cloudflare Turnstile ke server Cloudflare
 async function verifyTurnstile(token, remoteIp) {
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
@@ -79,22 +104,27 @@ async function verifyTurnstile(token, remoteIp) {
     return false;
   }
 
-  const formData = new URLSearchParams();
-  formData.append("secret", secretKey);
-  formData.append("response", token);
-  if (remoteIp) {
-    formData.append("remoteip", remoteIp);
-  }
-
-  const verifyResponse = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      body: formData,
+  try {
+    const formData = new URLSearchParams();
+    formData.append("secret", secretKey);
+    formData.append("response", token);
+    if (remoteIp) {
+      formData.append("remoteip", remoteIp);
     }
-  );
-  const result = await verifyResponse.json();
-  return Boolean(result.success);
+
+    const verifyResponse = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+    const result = await verifyResponse.json();
+    return Boolean(result.success);
+  } catch (error) {
+    console.error("Error pada verifikasi Cloudflare Turnstile:", error);
+    return false;
+  }
 }
 
 // Membaca payload multipart/form-data menggunakan Web Request API standar Node.js
@@ -149,7 +179,7 @@ export default async function handler(req, res) {
       audioFile = parsed.audioFile;
       textInput = typeof parsed.textInput === "string" ? parsed.textInput.trim() : "";
     } else {
-      const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+      const body = await parseJsonBody(req);
       textInput = typeof body.textInput === "string" ? body.textInput.trim() : "";
     }
 
@@ -175,7 +205,7 @@ export default async function handler(req, res) {
       );
     }
 
-    // Langkah 3: Siapkan payload multimodal untuk Gemini 2.5 Flash
+    // Langkah 3: Siapkan payload multimodal untuk Gemini
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return sendError(
@@ -208,20 +238,47 @@ export default async function handler(req, res) {
       );
     }
 
-    // Langkah 4: Panggil Gemini 2.5 Flash dengan JSON schema terkunci dan batas token efisien
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-        maxOutputTokens: 350,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    });
+// Langkah 4: Panggil Gemini dengan JSON schema terkunci dan auto-fallback saat server sibuk (503)
+    const candidateModels = [
+      process.env.GEMINI_MODEL || "gemini-3.8-flash",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+    ];
+    const modelConfig = {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+      maxOutputTokens: 350,
+    };
 
-    const parsedResult = JSON.parse(response.text);
+    let response = null;
+    let lastError = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents,
+          config: modelConfig,
+        });
+        break;
+      } catch (err) {
+        lastError = err;
+        const status = err?.status;
+        if (status === 503 || status === 404 || status === 429) {
+          console.warn(`Model ${modelName} tidak tersedia (${status}), mencoba model berikutnya...`);
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error("Seluruh model Gemini sedang sibuk.");
+    }
+   
+
+    const parsedResult = safeParseJson(response.text);
 
     // Langkah 5: Sanitasi panjang karakter sesuai aturan Firestore Rules sebelum dikirim
     const cleanDraft = {
@@ -235,7 +292,7 @@ export default async function handler(req, res) {
       summary: String(parsedResult.draft.summary || "").slice(0, MAX_SUMMARY_LENGTH),
       rawTranscript: String(parsedResult.draft.rawTranscript || textInput).slice(0, 2000),
       isValidReport: Boolean(parsedResult.draft.isValidReport),
-      audioQuality: hasText ? "text_input" : parsedResult.draft.audioQuality || "clear",
+      audioQuality: hasAudio ? parsedResult.draft.audioQuality || "clear" : "text_input",
     };
 
     return res.status(200).json({

@@ -31,7 +31,7 @@ export async function compressImage(
   let blob = await renderToBlob(imageBitmap, width, height, outputMimeType, quality);
 
   while (blob && blob.size > MAX_PHOTO_BYTES && quality > 0.3) {
-    quality -= 0.1;
+    quality = Number((quality - 0.1).toFixed(2));
     blob = await renderToBlob(imageBitmap, width, height, outputMimeType, quality);
   }
 
@@ -49,7 +49,8 @@ export async function compressImage(
 
   // Langkah 6: Bungkus Blob menjadi objek File baru dan buat URL pratinjau lokal
   const extension = outputMimeType === "image/webp" ? "webp" : "jpg";
-  const baseName = file.name.replace(/\.[^/.]+$/, "");
+  const rawName = typeof file.name === "string" ? file.name : "photo";
+  const baseName = rawName.replace(/\.[^/.]+$/, "") || "photo";
   const compressedFile = new File([blob], `${baseName}-compressed.${extension}`, {
     type: outputMimeType,
     lastModified: Date.now(),

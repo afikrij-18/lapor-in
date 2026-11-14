@@ -29,6 +29,7 @@ import {
   reverseGeocode,
   sendChatMessage,
 } from "../services/apiClient.js";
+import { signInAnonymouslySilent } from "../services/authService.js";
 import { createReport } from "../services/reportService.js";
 
 function ChatPageContent() {
@@ -100,6 +101,15 @@ function ChatPageContent() {
       return !prev;
     });
   }
+
+  // Langkah 1b: Hentikan suara sintesis browser ketika halaman chat ditutup atau berpindah rute
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   // Langkah 2: Jalankan pemrosesan awal laporan dari suara atau ketikan pertama
   const runInitialProcessing = useCallback(
@@ -180,7 +190,9 @@ function ChatPageContent() {
           token: incomingToken,
         });
       } else {
-        addMessage("model", t("chat.inputPlaceholder"));
+        const welcomeText = t("chat.welcome");
+        addMessage("model", welcomeText);
+        speakText(welcomeText);
       }
     });
   }, [
@@ -189,6 +201,7 @@ function ChatPageContent() {
     runInitialProcessing,
     setAudioBlob,
     setTurnstileToken,
+    speakText,
     t,
   ]);
 
@@ -369,6 +382,27 @@ function ChatPageContent() {
         `${t("chat.ticketTitle")}. ${t("chat.ticketLabel")}: ${result.ticketCode}`
       );
     } catch (error) {
+      // Alur pemulihan: Jika sesi anonim belum siap, lakukan inisialisasi ulang otomatis dan coba kirim sekali lagi
+      if (error?.code === "NOT_AUTHENTICATED") {
+        try {
+          await signInAnonymouslySilent();
+          const fileToSend = skipAttachments ? null : photoFile;
+          const audioToSend = skipAttachments ? null : draft.audioBlob;
+          const payloadDraft = {
+            ...draft,
+            hasPhoto: Boolean(fileToSend),
+          };
+          const retryResult = await createReport(payloadDraft, fileToSend, audioToSend);
+          setSubmittedTicket(retryResult.ticketCode);
+          speakText(
+            `${t("chat.ticketTitle")}. ${t("chat.ticketLabel")}: ${retryResult.ticketCode}`
+          );
+          return;
+        } catch (retryError) {
+          console.error("Gagal retry pengiriman laporan setelah silent auth:", retryError);
+        }
+      }
+
       const code = error?.code || "UNKNOWN_ERROR";
       setSubmitErrorCode(code);
       addMessage("model", t(`errors.${code}`));
@@ -536,7 +570,13 @@ function ChatPageContent() {
             draft={draft}
             photoPreviewUrl={photoPreviewUrl}
             onSaveEdit={(updated) => {
-              updateDraftFields(updated);
+              const updates = { ...updated };
+              if (updates.address && (draft.latitude === null || draft.longitude === null)) {
+                updates.latitude = draft.latitude ?? -0.9471;
+                updates.longitude = draft.longitude ?? 100.4172;
+                updates.geohash = draft.geohash || "qpz6t59";
+              }
+              updateDraftFields(updates);
               setForceManualCard(false);
             }}
             onOpenLocationPicker={() => setIsLocationModalOpen(true)}
@@ -664,7 +704,7 @@ function ChatPageContent() {
         </div>
       </div>
 
-      {/* Langkah 13: Modal placeholder pemilih lokasi (akan dilengkapi Zikri) */}
+      {/* Langkah 13: Modal pemilih lokasi interaktif dan fallback manual */}
       <LocationPickerModal
         isOpen={isLocationModalOpen}
         onClose={() => setIsLocationModalOpen(false)}
@@ -672,6 +712,9 @@ function ChatPageContent() {
         onUseCurrentGps={handleUseCurrentGps}
         isLocating={isLocating}
         initialAddress={draft.address}
+        initialLatitude={draft.latitude}
+        initialLongitude={draft.longitude}
+        initialGeohash={draft.geohash}
       />
     </div>
   );
@@ -683,4 +726,4 @@ export default function ChatPage() {
       <ChatPageContent />
     </ReportDraftProvider>
   );
-}
+} 
