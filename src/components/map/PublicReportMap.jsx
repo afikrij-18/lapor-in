@@ -4,9 +4,10 @@
 import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
-import { Locate, Navigation } from "lucide-react";
+import { Globe, Info, Locate, Navigation, X } from "lucide-react";
 import { COLOR_PALETTE, URGENCY_LEVELS } from "../../config/constants.js";
 import { useGeolocation } from "../../hooks/useGeolocation.js";
+import { useLanguage } from "../../hooks/useLanguage.js";
 
 // Impor stylesheet Leaflet dan MarkerCluster
 import "leaflet/dist/leaflet.css";
@@ -32,7 +33,7 @@ function createReportMarkerIcon(urgency) {
     bgColor = COLOR_PALETTE.RED_PRIMARY;
     pulseClass = "animate-pulse";
   } else if (urgency === URGENCY_LEVELS.HIGH) {
-    bgColor = COLOR_PALETTE.RED_HOVER;
+    bgColor = "#EA580C"; // Oranye / Amber terang untuk diferensiasi tajam terhadap Darurat (Merah)
   }
 
   const html = `
@@ -91,10 +92,18 @@ function createClusterIcon(cluster) {
 }
 
 // Komponen perantara untuk mengontrol pergerakan kamera peta
-function MapController({ selectedReport, userLocation }) {
+function MapController({
+  selectedReport,
+  userLocation,
+  resetTrigger,
+  reports = [],
+  filterKey = "",
+  isFilterActive = false
+}) {
   const map = useMap();
   const previousReportRef = useRef(null);
   const lastViewBeforeSelectionRef = useRef(null);
+  const isFirstFilterRef = useRef(true);
 
   useEffect(() => {
     // Langkah 1: Kunci batas zoom minimal ke level 5 dan batas geografis ke Indonesia secara imperatif
@@ -143,6 +152,51 @@ function MapController({ selectedReport, userLocation }) {
     }
   }, [map, userLocation]);
 
+  useEffect(() => {
+    // Langkah 4: Kembalikan tampilan kamera ke seluruh wilayah Indonesia saat tombol reset ditekan
+    if (resetTrigger > 0) {
+      lastViewBeforeSelectionRef.current = null;
+      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 1.2 });
+    }
+  }, [map, resetTrigger]);
+
+  useEffect(() => {
+    // Langkah 5: Otomatis zoom ke sebaran laporan saat filter dipilih
+    // Abaikan render pertama agar peta tetap berada di cakupan default Indonesia
+    if (isFirstFilterRef.current) {
+      isFirstFilterRef.current = false;
+      return;
+    }
+
+    // Jika semua filter dikembalikan ke "ALL", terbangkan kembali ke tampilan seluruh Indonesia
+    if (!isFilterActive) {
+      lastViewBeforeSelectionRef.current = null;
+      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 1.2 });
+      return;
+    }
+
+    // Filter laporan yang memiliki koordinat angka yang valid
+    const validReports = reports.filter(
+      (report) => typeof report.latitude === "number" && typeof report.longitude === "number"
+    );
+
+    if (validReports.length === 1) {
+      // Tepat 1 laporan: pusatkan ke laporan tersebut dengan zoom level 15
+      map.flyTo([validReports[0].latitude, validReports[0].longitude], 15, { duration: 1.2 });
+      lastViewBeforeSelectionRef.current = {
+        center: L.latLng(validReports[0].latitude, validReports[0].longitude),
+        zoom: 15
+      };
+    } else if (validReports.length > 1) {
+      // Lebih dari 1 laporan: bingkai seluruh laporan menggunakan bounding box
+      const bounds = L.latLngBounds(
+        validReports.map((report) => [report.latitude, report.longitude])
+      );
+      map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 1.2 });
+      lastViewBeforeSelectionRef.current = null;
+    }
+  }, [map, filterKey, isFilterActive, reports]);
+
   return null;
 }
 
@@ -184,6 +238,14 @@ function MarkerClusterLayer({ reports, onSelectReport }) {
             icon: createReportMarkerIcon(report.urgency)
           });
 
+          // Langkah 3b: Pasang tooltip cepat judul laporan saat di-hover
+          if (report.title) {
+            marker.bindTooltip(report.title, {
+              direction: "top",
+              offset: [0, -32]
+            });
+          }
+
           marker.on("click", () => {
             if (onSelectReport) {
               onSelectReport(report);
@@ -212,7 +274,7 @@ function MarkerClusterLayer({ reports, onSelectReport }) {
 }
 
 // Komponen marker lokasi pengguna
-function UserLocationMarker({ userLocation }) {
+function UserLocationMarker({ userLocation, tooltipText }) {
   const map = useMap();
   const markerRef = useRef(null);
 
@@ -233,7 +295,9 @@ function UserLocationMarker({ userLocation }) {
         icon: createUserMarkerIcon(),
         zIndexOffset: 1000
       });
-      marker.bindTooltip("Lokasi Anda Saat Ini", { permanent: false, direction: "top" });
+      if (tooltipText) {
+        marker.bindTooltip(tooltipText, { permanent: false, direction: "top" });
+      }
       marker.addTo(map);
       markerRef.current = marker;
     } else {
@@ -246,7 +310,7 @@ function UserLocationMarker({ userLocation }) {
         markerRef.current = null;
       }
     };
-  }, [map, userLocation]);
+  }, [map, userLocation, tooltipText]);
 
   return null;
 }
@@ -254,51 +318,160 @@ function UserLocationMarker({ userLocation }) {
 export function PublicReportMap({
   reports = [],
   selectedReport = null,
-  onSelectReport = () => { }
+  onSelectReport = () => { },
+  filterKey = "",
+  isFilterActive = false
 }) {
+  const { t } = useLanguage();
   const { coordinates: userLocation, loading: isLocating, getCurrentLocation } = useGeolocation();
   const [locateError, setLocateError] = useState(null);
+  const [resetTrigger, setResetTrigger] = useState(0);
+  const [isLegendOpen, setIsLegendOpen] = useState(false);
 
-  // Fungsi untuk meminta GPS dan memusatkan peta ke posisi warga saat tombol ditekan
+  // Langkah 1: Siapkan teks antarmuka dari id.json dengan fallback teks bahasa Indonesia yang aman
+  const resetIndonesiaLabel = (!t("map.resetIndonesia") || t("map.resetIndonesia") === "map.resetIndonesia")
+    ? "Seluruh Indonesia"
+    : t("map.resetIndonesia");
+
+  const resetIndonesiaTitle = (!t("map.resetIndonesiaTitle") || t("map.resetIndonesiaTitle") === "map.resetIndonesiaTitle")
+    ? "Kembalikan tampilan peta ke seluruh wilayah Indonesia"
+    : t("map.resetIndonesiaTitle");
+
+  const locateMeLabel = (!t("map.locateMe") || t("map.locateMe") === "map.locateMe")
+    ? "Lokasi Saya"
+    : t("map.locateMe");
+
+  const locatingLabel = (!t("map.locating") || t("map.locating") === "map.locating")
+    ? "Mencari Lokasi..."
+    : t("map.locating");
+
+  const locateTitle = (!t("map.locateTitle") || t("map.locateTitle") === "map.locateTitle")
+    ? "Tampilkan & pusatkan ke lokasi saya saat ini"
+    : t("map.locateTitle");
+
+  const myLocationTooltip = (!t("map.myLocation") || t("map.myLocation") === "map.myLocation")
+    ? "Lokasi Anda Saat Ini"
+    : t("map.myLocation");
+
+  // Langkah 2: Fungsi untuk mereset tampilan kamera peta kembali ke seluruh Indonesia
+  const handleResetToIndonesia = () => {
+    if (onSelectReport && selectedReport) {
+      onSelectReport(null);
+    }
+    setResetTrigger((prev) => prev + 1);
+  };
+
+  // Langkah 3: Fungsi untuk meminta GPS dan memusatkan peta ke posisi warga saat tombol ditekan
   const handleLocateMe = async () => {
     try {
       setLocateError(null);
       await getCurrentLocation();
     } catch (err) {
       console.error("Gagal mendeteksi lokasi pengguna:", err);
-      setLocateError("Izin lokasi tidak diberikan atau GPS tidak aktif.");
+      const errorMsg = (!t("map.locateError") || t("map.locateError") === "map.locateError")
+        ? "Izin lokasi tidak diberikan atau GPS tidak aktif."
+        : t("map.locateError");
+      setLocateError(errorMsg);
     }
   };
 
   return (
     <div className="relative w-full h-full min-h-0 overflow-hidden rounded-lg border border-[#D4D4D4] bg-[#F5F5F5]">
-      {/* Tombol Aksi Langsung: Pusatkan ke Lokasi Saya */}
-      <div className="absolute bottom-6 right-4 z-[1000] flex flex-col items-end gap-2">
+      {/* Tombol Aksi Kontrol Peta: Seluruh Indonesia & Lokasi Saya (FAB Bulat di Mobile, Kapsul di Desktop) */}
+      <div className="absolute bottom-6 right-4 z-[1000] flex flex-col items-end gap-2.5">
+        {/* Tombol Reset Kamera ke Seluruh Indonesia */}
+        <button
+          type="button"
+          onClick={handleResetToIndonesia}
+          className="w-11 h-11 sm:w-auto p-0 sm:px-3 sm:py-2 rounded-full sm:rounded-md flex items-center justify-center sm:gap-2 bg-[#0A0A0A] hover:bg-[#171717] text-white text-sm font-medium shadow-lg border border-[#D4D4D4] transition-colors cursor-pointer"
+          title={resetIndonesiaTitle}
+          aria-label={resetIndonesiaLabel}
+        >
+          <Globe className="w-5 h-5 sm:w-4 sm:h-4 text-[#DC2626]" />
+          <span className="hidden sm:inline">{resetIndonesiaLabel}</span>
+        </button>
+
+        {/* Tombol Aksi Langsung: Pusatkan ke Lokasi Saya */}
         <button
           type="button"
           onClick={handleLocateMe}
           disabled={isLocating}
-          className="flex items-center gap-2 px-3 py-2 bg-[#0A0A0A] hover:bg-[#171717] text-white text-sm font-medium rounded-md shadow-lg border border-[#D4D4D4] transition-colors disabled:opacity-50 cursor-pointer"
-          title="Tampilkan & pusatkan ke lokasi saya saat ini"
+          className="w-11 h-11 sm:w-auto p-0 sm:px-3 sm:py-2 rounded-full sm:rounded-md flex items-center justify-center sm:gap-2 bg-[#0A0A0A] hover:bg-[#171717] text-white text-sm font-medium shadow-lg border border-[#D4D4D4] transition-colors disabled:opacity-50 cursor-pointer"
+          title={locateTitle}
+          aria-label={locateMeLabel}
         >
-          <Locate className={`w-4 h-4 text-[#DC2626] ${isLocating ? "animate-spin" : ""}`} />
-          <span>{isLocating ? "Mencari Lokasi..." : "Lokasi Saya"}</span>
+          <Locate className={`w-5 h-5 sm:w-4 sm:h-4 text-[#DC2626] ${isLocating ? "animate-spin" : ""}`} />
+          <span className="hidden sm:inline">{isLocating ? locatingLabel : locateMeLabel}</span>
         </button>
 
         {/* Notifikasi info koordinat pengguna langsung */}
         {userLocation && (
-          <div className="bg-[#0A0A0A] text-white text-xs px-3 py-1.5 rounded-md shadow-md border border-[#D4D4D4] flex items-center gap-1.5">
-            <Navigation className="w-3.5 h-3.5 text-[#DC2626]" />
-            <span>
+          <div className="bg-[#0A0A0A] text-white text-[11px] sm:text-xs px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-md shadow-md border border-[#D4D4D4] flex items-center gap-1.5 max-w-[190px] sm:max-w-none truncate">
+            <Navigation className="w-3.5 h-3.5 text-[#DC2626] shrink-0" />
+            <span className="truncate">
               {userLocation.latitude.toFixed(5)}, {userLocation.longitude.toFixed(5)}
             </span>
           </div>
         )}
 
         {locateError && (
-          <div className="bg-[#DC2626] text-white text-xs px-3 py-1.5 rounded-md shadow-md">
+          <div className="bg-[#DC2626] text-white text-[11px] sm:text-xs px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-md shadow-md max-w-[200px] text-right">
             {locateError}
           </div>
+        )}
+      </div>
+
+      {/* Widget Legenda Simbol Peta (Pojok Kiri Bawah, Adaptif Mobile) */}
+      <div className="absolute bottom-6 left-4 z-[1000] flex flex-col items-start gap-1">
+        {isLegendOpen ? (
+          <div className="bg-[#0A0A0A]/95 text-white p-3 rounded-lg shadow-xl border border-[#D4D4D4] text-xs backdrop-blur-sm max-w-[230px] sm:max-w-[260px]">
+            <div className="flex items-center justify-between gap-3 border-b border-[#525252] pb-1.5 mb-2 font-bold text-sm">
+              <div className="flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-[#DC2626]" />
+                <span>{t("map.legendTitle", "Legenda Peta")}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLegendOpen(false)}
+                className="text-[#D4D4D4] hover:text-white p-0.5 rounded cursor-pointer"
+                title={t("common.close", "Tutup")}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded-full bg-[#DC2626] border border-white animate-pulse shrink-0"></span>
+                <span>{t("map.legendEmergency", "Darurat (Tindakan Segera)")}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded-full bg-[#EA580C] border border-white shrink-0"></span>
+                <span>{t("map.legendHigh", "Urgensi Tinggi")}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded-full bg-[#0A0A0A] border border-white shrink-0"></span>
+                <span>{t("map.legendNormal", "Urgensi Normal")}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-[#0A0A0A] border border-[#DC2626] text-[10px] font-bold text-white flex items-center justify-center shrink-0">
+                  5
+                </span>
+                <span>{t("map.legendCluster", "Kluster Laporan")}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsLegendOpen(true)}
+            className="w-11 h-11 sm:w-auto p-0 sm:px-3 sm:py-2 rounded-full sm:rounded-md flex items-center justify-center sm:gap-1.5 bg-[#0A0A0A] hover:bg-[#171717] text-white text-xs font-semibold shadow-lg border border-[#D4D4D4] transition-colors cursor-pointer"
+            title="Buka Legenda Simbol Peta"
+            aria-label={t("map.legendTitle", "Legenda Peta")}
+          >
+            <Info className="w-5 h-5 sm:w-3.5 sm:h-3.5 text-[#DC2626]" />
+            <span className="hidden sm:inline">{t("map.legendTitle", "Legenda Peta")}</span>
+          </button>
         )}
       </div>
 
@@ -321,9 +494,16 @@ export function PublicReportMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <MapController selectedReport={selectedReport} userLocation={userLocation} />
+        <MapController
+          selectedReport={selectedReport}
+          userLocation={userLocation}
+          resetTrigger={resetTrigger}
+          reports={reports}
+          filterKey={filterKey}
+          isFilterActive={isFilterActive}
+        />
         <MarkerClusterLayer reports={reports} onSelectReport={onSelectReport} />
-        <UserLocationMarker userLocation={userLocation} />
+        <UserLocationMarker userLocation={userLocation} tooltipText={myLocationTooltip} />
       </MapContainer>
     </div>
   );
