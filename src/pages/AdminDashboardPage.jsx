@@ -1,16 +1,17 @@
 // Route: /admin
-// Halaman Dashboard Admin - Lapor.in (Dengan Detail Modal & Tolak dengan Alasan)
+// Halaman Dashboard Admin - Lapor.in (Lengkap dengan Edit & Hapus Laporan)
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, ShieldCheck, AlertCircle, FileText, MapPin, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage.js';
 import { signOutAdmin, onAuthChange, isAdminUser } from '../services/authService.js';
-import { listReportsForAdmin, updateReportStatus } from '../services/reportService.js';
+import { listReportsForAdmin, updateReportStatus, deleteReport } from '../services/reportService.js';
 import AdminStatsBar from '../components/admin/AdminStatsBar.jsx';
 import ReportQueueTable from '../components/admin/ReportQueueTable.jsx';
 import ReportDetailModal from '../components/admin/ReportDetailModal.jsx';
 import RejectReasonModal from '../components/admin/RejectReasonModal.jsx';
+import ReportEditModal from '../components/admin/ReportEditModal.jsx';
 
 function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('queue');
@@ -22,11 +23,10 @@ function AdminDashboardPage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // State untuk modal detail laporan
+  // State untuk modal detail, tolak, dan edit
   const [selectedReportDetail, setSelectedReportDetail] = useState(null);
-
-  // State untuk modal alasan penolakan
   const [rejectingReportId, setRejectingReportId] = useState(null);
+  const [selectedReportEdit, setSelectedReportEdit] = useState(null);
 
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -69,7 +69,6 @@ function AdminDashboardPage() {
     return () => unsubscribe();
   }, [navigate, fetchReports]);
 
-  // Handler update status (termasuk memicu modal penolakan dengan alasan)
   const handleStatusChange = async (reportId, newStatus) => {
     try {
       setErrorMessage(null);
@@ -86,7 +85,6 @@ function AdminDashboardPage() {
     }
   };
 
-  // Konfirmasi penolakan dengan alasan dari modal
   const handleConfirmReject = async (reportId, reason) => {
     try {
       setErrorMessage(null);
@@ -95,6 +93,22 @@ function AdminDashboardPage() {
       fetchReports();
     } catch (error) {
       console.error('Gagal menolak laporan:', error);
+      const errCode = error?.code || 'default';
+      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.default'));
+    }
+  };
+
+  // Handler Hapus Laporan dengan konfirmasi (menggunakan teks admin.deleteConfirm)
+  const handleDeleteReport = async (reportId) => {
+    const confirmMessage = t('admin.deleteConfirm') || 'Apakah Anda yakin ingin menghapus laporan ini?';
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      setErrorMessage(null);
+      await deleteReport(reportId);
+      fetchReports();
+    } catch (error) {
+      console.error('Gagal menghapus laporan:', error);
       const errCode = error?.code || 'default';
       setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.default'));
     }
@@ -210,6 +224,8 @@ function AdminDashboardPage() {
                     reports={pendingQueue}
                     onUpdateStatus={handleStatusChange}
                     onDetail={(report) => setSelectedReportDetail(report)}
+                    onEdit={(report) => setSelectedReportEdit(report)}
+                    onDelete={handleDeleteReport}
                   />
                 </div>
               )}
@@ -220,6 +236,8 @@ function AdminDashboardPage() {
                     reports={reports}
                     onUpdateStatus={handleStatusChange}
                     onDetail={(report) => setSelectedReportDetail(report)}
+                    onEdit={(report) => setSelectedReportEdit(report)}
+                    onDelete={handleDeleteReport}
                   />
                 </div>
               )}
@@ -248,6 +266,15 @@ function AdminDashboardPage() {
           reportId={rejectingReportId}
           onConfirm={handleConfirmReject}
           onClose={() => setRejectingReportId(null)}
+        />
+      )}
+
+      {/* Modal Edit Laporan */}
+      {selectedReportEdit && (
+        <ReportEditModal
+          report={selectedReportEdit}
+          onClose={() => setSelectedReportEdit(null)}
+          onUpdated={fetchReports}
         />
       )}
     </div>

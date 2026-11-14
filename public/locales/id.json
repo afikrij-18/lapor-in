@@ -10,7 +10,8 @@
     "send": "Kirim",
     "skip": "Lewati",
     "yes": "Ya",
-    "no": "Tidak"
+    "no": "Tidak",
+    "logout": "Keluar"
   },
   "nav": {
     "publicMap": "Peta Publik",
@@ -91,6 +92,7 @@
     "selectHint": "Pilih pin pada peta untuk melihat detail laporan."
   },
   "admin": {
+    "headerTitle": "Panel Admin Lapor.in",
     "loginTitle": "Masuk Admin",
     "email": "Email",
     "password": "Kata Sandi",
@@ -108,6 +110,7 @@
     "columnUrgency": "Urgensi",
     "columnAiValid": "Penilaian AI",
     "columnAction": "Aksi",
+    "columnStatus": "Status",
     "aiValid": "Valid",
     "aiInvalid": "Perlu Dicek",
     "verify": "Verifikasi & Publikasikan",
