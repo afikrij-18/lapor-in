@@ -10,6 +10,7 @@ import { listReportsForAdmin, updateReportStatus } from '../services/reportServi
 import AdminStatsBar from '../components/admin/AdminStatsBar.jsx';
 import ReportQueueTable from '../components/admin/ReportQueueTable.jsx';
 import ReportDetailModal from '../components/admin/ReportDetailModal.jsx';
+import RejectReasonModal from '../components/admin/RejectReasonModal.jsx';
 
 function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('queue');
@@ -23,6 +24,9 @@ function AdminDashboardPage() {
 
   // State untuk modal detail laporan
   const [selectedReportDetail, setSelectedReportDetail] = useState(null);
+
+  // State untuk modal alasan penolakan
+  const [rejectingReportId, setRejectingReportId] = useState(null);
 
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -65,20 +69,32 @@ function AdminDashboardPage() {
     return () => unsubscribe();
   }, [navigate, fetchReports]);
 
-  // Handler update status (termasuk penolakan dengan alasan)
+  // Handler update status (termasuk memicu modal penolakan dengan alasan)
   const handleStatusChange = async (reportId, newStatus) => {
     try {
       setErrorMessage(null);
       if (newStatus === 'rejected') {
-        const reason = window.prompt(t('admin.rejectReason') || 'Masukkan alasan penolakan:');
-        if (reason === null) return; // Batal jika tombol cancel ditekan
-        await updateReportStatus(reportId, 'rejected', reason || 'Tidak memenuhi syarat');
-      } else {
-        await updateReportStatus(reportId, newStatus);
+        setRejectingReportId(reportId);
+        return;
       }
+      await updateReportStatus(reportId, newStatus);
       fetchReports();
     } catch (error) {
       console.error('Gagal memperbarui status laporan:', error);
+      const errCode = error?.code || 'default';
+      setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.default'));
+    }
+  };
+
+  // Konfirmasi penolakan dengan alasan dari modal
+  const handleConfirmReject = async (reportId, reason) => {
+    try {
+      setErrorMessage(null);
+      await updateReportStatus(reportId, 'rejected', reason);
+      setRejectingReportId(null);
+      fetchReports();
+    } catch (error) {
+      console.error('Gagal menolak laporan:', error);
       const errCode = error?.code || 'default';
       setErrorMessage(t(`errors.${errCode}`) !== `errors.${errCode}` ? t(`errors.${errCode}`) : t('errors.default'));
     }
@@ -223,6 +239,15 @@ function AdminDashboardPage() {
         <ReportDetailModal
           report={selectedReportDetail}
           onClose={() => setSelectedReportDetail(null)}
+        />
+      )}
+
+      {/* Modal Alasan Penolakan */}
+      {rejectingReportId && (
+        <RejectReasonModal
+          reportId={rejectingReportId}
+          onConfirm={handleConfirmReject}
+          onClose={() => setRejectingReportId(null)}
         />
       )}
     </div>

@@ -140,11 +140,24 @@ export default function ReportDetailModal({ report, onClose }) {
             </div>
           </div>
 
+          {/* Alasan Penolakan (Hanya muncul jika status rejected) */}
+          {(report.status === 'rejected' || report.rejectionReason || privateData?.rejectionReason) && (
+            <div className="bg-[#DC2626]/10 p-5 rounded-xl border border-[#DC2626]/40 space-y-2">
+              <span className="text-xs text-[#DC2626] block font-semibold uppercase tracking-wider">
+                Alasan Penolakan Laporan:
+              </span>
+              <p className="text-[#FFFFFF] text-base leading-relaxed">
+                {report.rejectionReason || privateData?.rejectionReason || privateData?.adminNotes || 'Tidak ada alasan spesifik yang dicatat.'}
+              </p>
+            </div>
+          )}
+
           {/* Ringkasan Laporan */}
           <div className="bg-[#0A0A0A] p-5 rounded-xl border border-[#D4D4D4]/20">
             <span className="text-[#D4D4D4] text-xs uppercase tracking-wider block mb-2 font-semibold">Ringkasan Masalah</span>
             <p className="text-[#FFFFFF] leading-relaxed text-base">{report.summary || 'Tidak ada ringkasan.'}</p>
           </div>
+
 
           {/* Transkrip Asli & Catatan Admin */}
           <div className="bg-[#0A0A0A] p-5 rounded-xl border border-[#D4D4D4]/20 space-y-4">
