@@ -44,6 +44,37 @@ export function useAudioRecorder({ onLimitReached } = {}) {
     });
   };
 
+  // Langkah 2b: Batalkan rekaman secara aman tanpa memproses atau menyimpan data
+  const cancelRecording = () => {
+    isRecordingRef.current = false;
+    setIsRecording(false);
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.onstop = null;
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {
+        console.warn('MediaRecorder sudah berhenti:', err);
+      }
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    audioChunksRef.current = [];
+    lastBlobRef.current = null;
+    resolveStopRef.current = null;
+    setAudioBlob(null);
+    setRecordingTime(0);
+  };
+
   const startRecording = async () => {
     audioChunksRef.current = [];
     lastBlobRef.current = null;
@@ -133,5 +164,6 @@ export function useAudioRecorder({ onLimitReached } = {}) {
     recordingTime,
     startRecording,
     stopRecording,
+    cancelRecording,
   };
 }

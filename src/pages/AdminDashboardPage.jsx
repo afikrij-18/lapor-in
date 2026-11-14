@@ -282,13 +282,24 @@ function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#FFFFFF] flex flex-col text-base">
-      {/* Header Panel Admin */}
-      <header className="bg-[#171717] border-b border-[#D4D4D4]/30 px-4 sm:px-6 py-4 flex justify-between items-center shadow-md">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-[#DC2626] rounded-xl flex items-center justify-center text-[#FFFFFF] shadow-md">
-            <ShieldCheck size={24} />
+      {/* Header Panel Admin dengan Identitas Brand Lapor.in Resmi */}
+      <header className="bg-[#171717] border-b border-[#D4D4D4]/30 px-4 sm:px-6 py-3.5 flex justify-between items-center shadow-md">
+        <div className="flex items-center gap-3">
+          {/* Ikon Perisai Verifikasi / Shield Check sesuai logo resmi */}
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-b from-[#1F1F1F] to-[#0A0A0A] border-2 border-[#DC2626] flex items-center justify-center text-white shadow-[0_0_12px_rgba(220,38,38,0.35)] shrink-0">
+            <ShieldCheck className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-white" strokeWidth={2.5} />
           </div>
-          <span className="font-bold tracking-wider text-lg">{t('admin.headerTitle')}</span>
+
+          {/* Tipografi Brand & Subjudul Portal Moderator */}
+          <div className="flex flex-col justify-center">
+            <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#FFFFFF] leading-none">
+              Lapor<span className="text-[#DC2626]">.in</span>
+            </span>
+            <div className="h-px bg-[#DC2626] w-full my-0.5 opacity-90" />
+            <span className="text-[7.5px] sm:text-[8.5px] font-medium text-[#D4D4D4] tracking-wider whitespace-nowrap leading-none uppercase">
+              {t('admin.portalSubtitle', null, 'Portal Moderator & Verifikasi')}
+            </span>
+          </div>
         </div>
         <div className="flex items-center space-x-4">
           <span className="text-sm sm:text-base text-[#D4D4D4] hidden sm:inline font-mono">

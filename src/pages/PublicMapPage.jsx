@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Search,
   ShieldAlert,
+  ShieldCheck,
   SlidersHorizontal,
   Tag,
   Trash2,
@@ -228,20 +229,33 @@ function PublicMapPage() {
 
   return (
     <main className="flex flex-col bg-[#FFFFFF] text-[#0A0A0A]">
-      {/* Header Halaman Peta */}
-      <header className="border-b border-[#D4D4D4] bg-[#0A0A0A] text-[#FFFFFF] px-3.5 py-2.5 sm:px-6 sm:py-3 shrink-0">
+      {/* Header Halaman Peta Resmi dengan Identitas Lapor.in */}
+      <header className="border-b border-[#D4D4D4]/30 bg-[#0A0A0A] text-[#FFFFFF] px-3.5 py-2.5 sm:px-6 sm:py-3 shrink-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
             <Link
               to="/"
-              className="p-1.5 rounded-md hover:bg-[#171717] transition-colors text-white shrink-0"
+              className="flex items-center gap-2 text-white hover:opacity-90 transition-opacity shrink-0"
               title={t("common.back")}
             >
-              <ArrowLeft className="w-5 h-5" />
+              <div className="p-1 rounded-lg hover:bg-[#171717] text-[#D4D4D4] hover:text-white transition-colors">
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-b from-[#1F1F1F] to-[#0A0A0A] border border-[#DC2626] flex items-center justify-center text-white shadow-[0_0_8px_rgba(220,38,38,0.3)] shrink-0">
+                  <ShieldCheck className="w-4 h-4 text-white" strokeWidth={2.5} />
+                </div>
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-[#FFFFFF] hidden xs:inline">
+                  Lapor<span className="text-[#DC2626]">.in</span>
+                </span>
+              </div>
             </Link>
+
+            <div className="h-4 w-px bg-[#262626] hidden sm:block shrink-0" />
+
             <div className="min-w-0">
-              <h1 className="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-1.5 sm:gap-2 truncate">
-                <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-[#DC2626] shrink-0" />
+              <h1 className="text-sm sm:text-base md:text-lg font-bold tracking-tight text-white flex items-center gap-1.5 truncate">
+                <MapPin className="w-4 h-4 text-[#DC2626] shrink-0" />
                 <span className="sm:hidden">{t("map.mapShortTitle", "Peta Laporan")}</span>
                 <span className="hidden sm:inline">{t("map.title")}</span>
               </h1>

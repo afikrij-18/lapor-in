@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export function useSpeechSynthesis() {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -31,9 +31,29 @@ export function useSpeechSynthesis() {
     setIsSpeaking(false);
   }, [isSupported]);
 
+  // Langkah 3: Toggle berbicara / henti secara bergantian
+  const toggleSpeak = useCallback((text) => {
+    if (!isSupported) return;
+    if (isSpeaking) {
+      stop();
+    } else {
+      speak(text);
+    }
+  }, [isSupported, isSpeaking, speak, stop]);
+
+  // Langkah 4: Hentikan pembacaan saat komponen ditutup
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   return {
     speak,
     stop,
+    toggleSpeak,
     isSpeaking,
     isSupported,
   };

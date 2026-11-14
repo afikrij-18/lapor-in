@@ -19,7 +19,7 @@ export default function AdminStatsBar({ stats, activeFilter = 'all', onFilterCli
             ? 'border-[#FFFFFF] ring-2 ring-[#FFFFFF]/40 bg-[#222222]'
             : 'border-[#D4D4D4]/30 hover:border-[#D4D4D4] hover:bg-[#202020]'
         }`}
-        title={t('admin.clickToFilter', null, 'Klik untuk melihat semua laporan')}
+        title={t('admin.filterAllTooltip', null, 'Klik untuk melihat semua laporan')}
       >
         <div>
           <p className="text-sm text-[#D4D4D4]">{t('admin.statTotal', null, 'Total')}</p>
@@ -39,7 +39,7 @@ export default function AdminStatsBar({ stats, activeFilter = 'all', onFilterCli
             ? 'border-amber-500 ring-2 ring-amber-500/40 bg-[#222222]'
             : 'border-[#D4D4D4]/30 hover:border-amber-500/60 hover:bg-[#202020]'
         }`}
-        title={t('admin.clickToFilter', null, 'Klik untuk menyaring laporan yang menunggu verifikasi')}
+        title={t('admin.filterPendingTooltip', null, 'Klik untuk menyaring laporan yang menunggu verifikasi')}
       >
         <div>
           <p className="text-sm text-[#D4D4D4]">{t('admin.statPending', null, 'Menunggu')}</p>
@@ -59,7 +59,7 @@ export default function AdminStatsBar({ stats, activeFilter = 'all', onFilterCli
             ? 'border-[#DC2626] ring-2 ring-[#DC2626]/50 bg-[#222222]'
             : 'border-[#DC2626] hover:border-[#B91C1C] hover:bg-[#202020]'
         }`}
-        title={t('admin.clickToFilter', null, 'Klik untuk menyaring laporan darurat')}
+        title={t('admin.filterEmergencyTooltip', null, 'Klik untuk menyaring laporan darurat')}
       >
         <div>
           <p className="text-sm text-[#FEE2E2] font-semibold">{t('admin.statEmergency', null, 'Darurat')}</p>
@@ -79,7 +79,7 @@ export default function AdminStatsBar({ stats, activeFilter = 'all', onFilterCli
             ? 'border-emerald-500 ring-2 ring-emerald-500/40 bg-[#222222]'
             : 'border-[#D4D4D4]/30 hover:border-emerald-500/60 hover:bg-[#202020]'
         }`}
-        title={t('admin.clickToFilter', null, 'Klik untuk menyaring laporan selesai')}
+        title={t('admin.filterResolvedTooltip', null, 'Klik untuk menyaring laporan selesai')}
       >
         <div>
           <p className="text-sm text-[#D4D4D4]">{t('admin.statResolved', null, 'Selesai')}</p>
