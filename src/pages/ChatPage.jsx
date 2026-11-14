@@ -5,12 +5,18 @@ import { Navigate, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowLeft,
+  Bot,
+  Check,
   CheckCircle2,
+  Construction,
+  Droplets,
   Edit3,
+  Lightbulb,
   Loader2,
   Mic,
   RefreshCw,
   Send,
+  Trash2,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -27,6 +33,14 @@ import {
 } from "../services/apiClient.js";
 import { signInAnonymouslySilent } from "../services/authService.js";
 import { createReport } from "../services/reportService.js";
+
+// Contoh laporan siap ketuk: ikon, kunci label, dan kunci kalimat awal (teksnya di id.json)
+const REPORT_SUGGESTIONS = [
+  { icon: Construction, labelKey: "chat.suggestRoadLabel", textKey: "chat.suggestRoadText" },
+  { icon: Lightbulb, labelKey: "chat.suggestLampLabel", textKey: "chat.suggestLampText" },
+  { icon: Trash2, labelKey: "chat.suggestTrashLabel", textKey: "chat.suggestTrashText" },
+  { icon: Droplets, labelKey: "chat.suggestDrainLabel", textKey: "chat.suggestDrainText" },
+];
 
 function ChatPageContent() {
   const navigate = useNavigate();
@@ -65,6 +79,7 @@ function ChatPageContent() {
   const [submittedTicket, setSubmittedTicket] = useState(null);
 
   const hasInitializedRef = useRef(false);
+  const inputRef = useRef(null);
   const initialAudioRef = useRef(null);
   const initialTextRef = useRef("");
 
@@ -188,6 +203,13 @@ function ChatPageContent() {
       audioQuality: "text_input",
       isValidReport: true,
     });
+  }
+
+  // Langkah 5: Contoh laporan diketuk (0 token AI): kalimat awalnya masuk ke kolom ketik,
+  // lalu warga melengkapi sendiri. Tidak ada yang terkirim otomatis.
+  function handleUseSuggestion(text) {
+    setInputText(text);
+    inputRef.current?.focus();
   }
 
   // Langkah 6: Ambil koordinat GPS perangkat dan lakukan reverse geocoding
@@ -422,6 +444,22 @@ function ChatPageContent() {
   }
 
   const hasDraftReady = Boolean(draft.title || draft.summary || forceManualCard);
+  // Penanda langkah: dihitung dari isi draf, tanpa state tambahan
+  const hasStory = Boolean(draft.title || draft.summary);
+  const hasLocation = draft.latitude !== null && draft.longitude !== null;
+  const hasPhoto = Boolean(photoPreviewUrl);
+  const currentStepKey = !hasStory ? "story" : !hasLocation ? "location" : "send";
+  const steps = [
+    { key: "story", label: t("chat.stepStory"), done: hasStory },
+    { key: "location", label: t("chat.stepLocation"), done: hasLocation },
+    { key: "photo", label: t("chat.stepPhoto"), done: hasPhoto },
+    { key: "send", label: t("chat.stepSend"), done: false },
+  ];
+
+  // Contoh laporan hanya tampil sebelum warga mulai bercerita
+  const hasUserMessage = messages.some((message) => message.role === "user");
+  const showSuggestions = !hasDraftReady && !hasUserMessage && !isProcessing;
+
   const isAttachmentError =
     submitErrorCode === "PHOTO_TOO_LARGE" || submitErrorCode === "AUDIO_TOO_LARGE";
 
@@ -441,9 +479,27 @@ function ChatPageContent() {
             <span className="hidden sm:inline">{t("common.back")}</span>
           </button>
 
-          <h1 className="truncate text-lg font-bold text-[#FFFFFF]">
-            {t("chat.title")}
-          </h1>
+          {/* Avatar asisten, nama, dan status */}
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div
+              aria-hidden="true"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#DC2626] text-[#FFFFFF]"
+            >
+              <Bot className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-base leading-tight font-bold text-[#FFFFFF] sm:text-lg">
+                {t("chat.title")}
+              </h1>
+              <p className="flex items-center gap-1.5 text-sm text-[#D4D4D4]" aria-live="polite">
+                <span
+                  aria-hidden="true"
+                  className={`h-2 w-2 rounded-full bg-[#DC2626] ${isProcessing ? "animate-pulse" : ""}`}
+                />
+                <span>{isProcessing ? t("chat.statusTyping") : t("chat.statusActive")}</span>
+              </p>
+            </div>
+          </div>
 
           <button
             type="button"
@@ -463,12 +519,73 @@ function ChatPageContent() {
         </div>
       </header>
 
+      {/* Langkah 10b: Penanda langkah. Selesai: centang hitam. Sedang dikerjakan: merah */}
+      <nav
+        aria-label={t("chat.stepsLabel")}
+        className="shrink-0 border-b border-[#D4D4D4] bg-[#FFFFFF] px-4 py-2"
+      >
+        <ol className="mx-auto flex max-w-3xl items-center justify-between gap-1.5 sm:gap-3">
+          {steps.map((step, index) => {
+            const isCurrent = !step.done && step.key === currentStepKey;
+            return (
+              <li key={step.key} className="flex items-center gap-1.5 sm:flex-1 sm:gap-2">
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                    step.done
+                      ? "bg-[#0A0A0A] text-[#FFFFFF]"
+                      : isCurrent
+                      ? "bg-[#DC2626] text-[#FFFFFF]"
+                      : "border border-[#D4D4D4] bg-[#FFFFFF] text-[#525252]"
+                  }`}
+                >
+                  {step.done ? <Check className="h-4 w-4" /> : index + 1}
+                </span>
+                <span
+                  className={`text-sm whitespace-nowrap ${
+                    step.done || isCurrent ? "font-bold text-[#0A0A0A]" : "font-medium text-[#525252]"
+                  }`}
+                >
+                  {step.label}
+                </span>
+                {index < steps.length - 1 && (
+                  <span aria-hidden="true" className="hidden h-px flex-1 bg-[#D4D4D4] sm:block" />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+
       {/* Langkah 11: Area riwayat percakapan beserta kartu pratinjau dan banner alur gagal */}
       <ChatWindow
         messages={messages}
         isProcessing={isProcessing}
         onSpeak={speakText}
       >
+        {showSuggestions && (
+          <div className="chat-bubble-in sm:pl-12">
+            <p className="mb-2.5 text-base font-medium text-[#525252]">
+              {t("chat.suggestionsTitle")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {REPORT_SUGGESTIONS.map((suggestion) => {
+                const SuggestionIcon = suggestion.icon;
+                return (
+                  <button
+                    key={suggestion.labelKey}
+                    type="button"
+                    onClick={() => handleUseSuggestion(t(suggestion.textKey))}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#0A0A0A] bg-[#FFFFFF] px-4 py-2 text-base font-semibold text-[#0A0A0A] shadow-sm hover:bg-[#FEE2E2]"
+                  >
+                    <SuggestionIcon className="h-5 w-5 text-[#DC2626]" />
+                    <span>{t(suggestion.labelKey)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {processErrorCode && (
           <div className="sm:pl-12">
             {/* Pesan gagalnya sudah tampil sebagai gelembung asisten; di sini cukup pilihan lanjutnya */}
@@ -603,6 +720,7 @@ function ChatPageContent() {
 
           <form onSubmit={handleSendMessage} className="flex items-center gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}

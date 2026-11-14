@@ -86,19 +86,22 @@ export default function ReportPreviewCard({
 
   return (
     <div
-      className={`rounded-2xl border-2 p-4 shadow-xs transition-colors sm:p-5 ${
-        isEmergency
-          ? "border-[#DC2626] bg-[#FEE2E2]/40"
-          : "border-[#0A0A0A] bg-[#FFFFFF]"
+      className={`chat-bubble-in overflow-hidden rounded-2xl border-2 bg-[#FFFFFF] shadow-lg transition-colors ${
+        isEmergency ? "border-[#DC2626]" : "border-[#0A0A0A]"
       }`}
     >
       {/* Langkah 3: Header kartu berisi judul kartu, badge urgensi, dan tombol Edit Field */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[#D4D4D4] pb-3">
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-[#0A0A0A]" />
-          <span className="text-base font-bold text-[#0A0A0A]">
-            {draft.title || t("report.title")}
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-[#0A0A0A] px-4 py-3 text-[#FFFFFF] sm:px-5">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <FileText className="mt-1 h-5 w-5 shrink-0 text-[#DC2626]" />
+          <div className="min-w-0">
+            <span className="block text-sm font-semibold tracking-wide text-[#D4D4D4] uppercase">
+              {t("chat.draftLabel")}
+            </span>
+            <span className="block text-lg leading-snug font-bold break-words text-[#FFFFFF]">
+              {draft.title || t("report.title")}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -107,8 +110,8 @@ export default function ReportPreviewCard({
               isEmergency
                 ? "bg-[#DC2626] text-[#FFFFFF]"
                 : draft.urgency === URGENCY_LEVELS.HIGH
-                ? "bg-[#0A0A0A] text-[#FFFFFF]"
-                : "border border-[#D4D4D4] bg-[#F5F5F5] text-[#0A0A0A]"
+                ? "bg-[#FFFFFF] text-[#0A0A0A]"
+                : "border border-[#D4D4D4] text-[#FFFFFF]"
             }`}
           >
             {isEmergency && <AlertTriangle className="h-4 w-4" />}
@@ -120,7 +123,7 @@ export default function ReportPreviewCard({
               type="button"
               onClick={handleStartEdit}
               disabled={disabled}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#0A0A0A] bg-[#FFFFFF] px-3 py-1.5 text-base font-semibold text-[#0A0A0A] hover:bg-[#F5F5F5] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFFFFF] px-3 py-1.5 text-base font-semibold text-[#FFFFFF] hover:bg-[#171717] disabled:opacity-50"
             >
               <Edit3 className="h-4 w-4" />
               <span>{t("chat.editField")}</span>
@@ -130,6 +133,7 @@ export default function ReportPreviewCard({
       </div>
 
       {/* Langkah 4: Tampilkan formulir edit inline atau tampilan ringkasan baca-saja */}
+      <div className={`p-4 sm:p-5 ${isEmergency ? "bg-[#FEE2E2]/40" : ""}`}>
       {activeEditing ? (
         <form onSubmit={handleSave} className="space-y-3 text-base">
           <div>
@@ -296,6 +300,7 @@ export default function ReportPreviewCard({
           </div>
         </dl>
       )}
+      </div>
     </div>
   );
 }
