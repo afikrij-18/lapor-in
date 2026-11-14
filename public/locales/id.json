@@ -15,6 +15,7 @@
   "nav": {
     "publicMap": "Peta Publik",
     "newReport": "Buat Laporan Baru",
+    "admin": "Admin",
     "logout": "Keluar"
   },
   "footer": {
@@ -23,15 +24,17 @@
   },
   "home": {
     "title": "Suarakan Masalah Lingkungan Anda Secara Aman",
-    "subtitle": "Tanpa Login Rumit - Mendukung Bahasa Daerah dan Suara",
+    "subtitle": "Tanpa Login Rumit • Mendukung Bahasa Daerah & Suara",
     "micButton": "Tekan & Ceritakan Masalah Anda",
+    "micStart": "Mulai Rekam",
     "micRecording": "Sedang merekam...",
+    "micRecordingHint": "Sedang merekam... Tekan kembali jika sudah selesai.",
     "stopRecording": "Selesai Bicara",
     "manualButton": "Ketik Laporan Secara Manual",
     "retentionNotice": "Rekaman suara disimpan maksimal 30 hari untuk verifikasi admin.",
     "statusSafe": "Aman & Anonim",
     "handledCount": "{count} Laporan Ditangani",
-    "micDenied": "Mikrofon tidak dapat dipakai. Silakan ketik laporan Anda.",
+    "micDenied": "Izin mikrofon ditolak atau perangkat tidak mendukung. Silakan gunakan opsi ketik manual di bawah.",
     "recordingLimit": "Batas rekaman 120 detik tercapai. Rekaman Anda sedang diproses."
   },
   "chat": {
