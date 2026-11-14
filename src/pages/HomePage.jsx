@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/common/Navbar';
 import TurnstileWidget from '../components/common/TurnstileWidget';
@@ -9,44 +10,56 @@ import { useLanguage } from '../context/LanguageContext';
 export default function HomePage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { isRecording, audioBlob, recordingTime, startRecording, stopRecording } = useAudioRecorder();
+  const { isRecording, recordingTime, startRecording, stopRecording } = useAudioRecorder();
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // Langkah 1: Tangani aksi klik pada tombol mikrofon utama
   const handleMicClick = async () => {
+    setErrorMessage('');
     if (!isRecording) {
       try {
         await startRecording();
       } catch (err) {
         console.error('Gagal mengakses mikrofon:', err);
-        alert('Izin mikrofon ditolak atau perangkat tidak mendukung. Silakan gunakan opsi ketik manual.');
+        setErrorMessage(t('home.micPermissionError') || 'Izin mikrofon ditolak atau perangkat tidak mendukung. Silakan gunakan opsi ketik manual di bawah.');
       }
     } else {
-      stopRecording();
-      // Langkah 2: Navigasi ke halaman chat membawa state audio rekaman
-      navigate('/chat', { state: { mode: 'audio', audioBlob } });
+      // Tunggu blob rekaman selesai diproses sebelum navigasi
+      const blob = await stopRecording();
+      navigate('/chat', { 
+        state: { 
+          mode: 'audio', 
+          audioBlob: blob, 
+          turnstileToken 
+        } 
+      });
     }
   };
 
-  // Langkah 3: Tangani aksi klik pada tombol input manual
   const handleManualClick = () => {
-    navigate('/chat', { state: { mode: 'manual' } });
+    navigate('/chat', { state: { mode: 'manual', turnstileToken } });
   };
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col justify-between">
       <Navbar />
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 text-center max-w-2xl mx-auto">
-        {/* Langkah 4: Judul utama dan subjudul aksesibilitas */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 text-center max-w-2xl mx-auto py-10">
         <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3">
           {t('home.title') || 'Suarakan Masalah Lingkungan Anda Secara Aman'}
         </h1>
-        <p className="text-[#525252] text-sm md:text-base mb-10">
+        <p className="text-[#D4D4D4] text-base md:text-lg mb-8">
           {t('home.subtitle') || 'Tanpa Login Rumit • Mendukung Bahasa Daerah & Suara'}
         </p>
 
-        {/* Langkah 5: Tombol Mikrofon Utama (Mic Hero) */}
-        <div className="my-6">
+        {/* Notifikasi galat inline jika mikrofon ditolak (Menggantikan alert) */}
+        {errorMessage && (
+          <div className="mb-6 p-4 bg-[#FEE2E2] text-[#DC2626] rounded-xl text-base font-medium max-w-md">
+            {errorMessage}
+          </div>
+        )}
+
+        <div className="my-4">
           <MicHeroButton 
             isRecording={isRecording} 
             recordingTime={recordingTime} 
@@ -54,22 +67,16 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Langkah 6: Tombol Sekunder Input Manual */}
-        <div className="w-full max-w-xs mt-4">
+        <div className="w-full max-w-xs mt-6">
           <ManualInputBtn onClick={handleManualClick} />
         </div>
 
-        {/* Langkah 7: Pemberitahuan retensi audio 30 hari */}
-        <p className="mt-12 text-xs text-[#525252]">
+        <p className="mt-10 text-base text-[#D4D4D4]">
           {t('home.retentionNotice') || 'Rekaman suara disimpan maksimal 30 hari untuk verifikasi admin.'}
         </p>
 
-        <TurnstileWidget />
+        <TurnstileWidget onSuccess={(token) => setTurnstileToken(token)} />
       </main>
-
-      <footer className="py-4 text-center text-xs text-[#525252] border-t border-[#171717]">
-        Lapor.in • AI for Access and Digital Life (Minimize Team)
-      </footer>
     </div>
   );
 }

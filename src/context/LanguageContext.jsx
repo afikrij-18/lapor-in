@@ -1,16 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState } from 'react';
-
-// Kamus terpusat Bahasa Indonesia (sesuai id.json)
-const idDictionary = {
-  home: {
-    title: "Suarakan Masalah Lingkungan Anda Secara Aman",
-    subtitle: "Tanpa Login Rumit • Mendukung Bahasa Daerah & Suara",
-    micButton: "Tekan & Ceritakan Masalah Anda",
-    manualInputBtn: "Ketik Laporan Secara Manual",
-    retentionNotice: "Rekaman suara disimpan maksimal 30 hari untuk verifikasi admin."
-  }
-};
+import idJson from '../../public/locales/id.json';
 
 const LanguageContext = createContext();
 
@@ -20,7 +10,7 @@ export function LanguageProvider({ children }) {
   // Fungsi helper untuk mengambil teks berdasarkan path (contoh: 'home.title')
   const t = (path) => {
     const keys = path.split('.');
-    let value = idDictionary;
+    let value = idJson;
     for (const k of keys) {
       if (value && value[k]) {
         value = value[k];

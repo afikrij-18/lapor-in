@@ -7,6 +7,8 @@ export function useAudioRecorder() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
+  const isRecordingRef = useRef(false);
+  const resolveStopRef = useRef(null);
 
   const MAX_SECONDS = 120; // Batas durasi maksimal 120 detik sesuai PRD
 
@@ -16,7 +18,6 @@ export function useAudioRecorder() {
     setRecordingTime(0);
 
     try {
-      // Langkah 1: Meminta izin akses mikrofon dengan filter noise suppression
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -25,14 +26,13 @@ export function useAudioRecorder() {
         },
       });
 
-      // Langkah 2: Pilih mimeType yang didukung browser
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : 'audio/mp4';
 
       mediaRecorderRef.current = new MediaRecorder(stream, {
         mimeType,
-        audioBitsPerSecond: 24000, // Target bitrate 24 kbps sesuai PRD
+        audioBitsPerSecond: 24000,
       });
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -44,14 +44,19 @@ export function useAudioRecorder() {
       mediaRecorderRef.current.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(blob);
-        // Hentikan seluruh track media stream setelah selesai
         stream.getTracks().forEach((track) => track.stop());
+        
+        if (resolveStopRef.current) {
+          resolveStopRef.current(blob);
+          resolveStopRef.current = null;
+        }
       };
 
-      mediaRecorderRef.current.start(1000); // Ambil data per detik
+      mediaRecorderRef.current.start(1000);
       setIsRecording(true);
+      isRecordingRef.current = true;
 
-      // Langkah 3: Jalankan timer durasi & auto-stop pada 120 detik
+      // Timer durasi & auto-stop pada 120 detik
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => {
           if (prev >= MAX_SECONDS - 1) {
@@ -63,17 +68,25 @@ export function useAudioRecorder() {
       }, 1000);
     } catch (error) {
       console.error('Gagal mengakses mikrofon:', error);
-      // Mematuhi aturan preserve-caught-error dengan menyertakan cause
       throw new Error('MIC_PERMISSION_DENIED', { cause: error });
     }
   };
 
+  // Diubah menjadi fungsi biasa tanpa useCallback agar selaras dengan React Compiler
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      clearInterval(timerRef.current);
-    }
+    return new Promise((resolve) => {
+      if (mediaRecorderRef.current && isRecordingRef.current) {
+        resolveStopRef.current = resolve;
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+      } else {
+        resolve(audioBlob);
+      }
+    });
   };
 
   useEffect(() => {

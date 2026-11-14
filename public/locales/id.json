@@ -1,9 +1,17 @@
 {
+  "nav": {
+    "brand": "Lapor.in",
+    "publicMap": "Peta Publik",
+    "admin": "Admin"
+  },
   "home": {
     "title": "Suarakan Masalah Lingkungan Anda Secara Aman",
     "subtitle": "Tanpa Login Rumit • Mendukung Bahasa Daerah & Suara",
     "micButton": "Tekan & Ceritakan Masalah Anda",
+    "recordingActive": "Sedang merekam... Tekan kembali jika sudah selesai.",
     "manualInputBtn": "Ketik Laporan Secara Manual",
-    "retentionNotice": "Rekaman suara disimpan maksimal 30 hari untuk verifikasi admin."
+    "retentionNotice": "Rekaman suara disimpan maksimal 30 hari untuk verifikasi admin.",
+    "micPermissionError": "Izin mikrofon ditolak atau perangkat tidak mendukung. Silakan gunakan opsi ketik manual di bawah."
   }
+  
 }
