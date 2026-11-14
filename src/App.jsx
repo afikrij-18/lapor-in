@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Footer from "./components/common/Footer.jsx";
+import RequireAdmin from "./components/common/RequireAdmin.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { ReportDraftProvider } from "./context/ReportDraftContext.jsx";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
@@ -33,7 +34,15 @@ function App() {
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/peta" element={<PublicMapPage />} />
               <Route path="/admin/login" element={<AdminLoginPage />} />
-              <Route path="/admin" element={<AdminDashboardPage />} />
+              {/* Dashboard hanya untuk admin; selain admin diarahkan ke /admin/login */}
+              <Route
+                path="/admin"
+                element={
+                  <RequireAdmin>
+                    <AdminDashboardPage />
+                  </RequireAdmin>
+                }
+              />
               {/* Alamat yang tidak dikenal diarahkan ke halaman utama */}
               <Route path="*" element={<HomePage />} />
             </Routes>
